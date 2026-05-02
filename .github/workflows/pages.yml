@@ -30,6 +30,7 @@ jobs:
           VITE_STICKER_LAB_ONLY: "true"
           VITE_VILO_CUTOUT_ENDPOINT: ${{ vars.VILO_CUTOUT_ENDPOINT }}
           VITE_VILO_REMOTE_CUTOUT_MODEL: ${{ vars.VILO_REMOTE_CUTOUT_MODEL || 'isnet-general-use' }}
+          VITE_VILO_ANALYZE_ENDPOINT: ${{ vars.VILO_ANALYZE_ENDPOINT }}
       - run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -3,7 +3,7 @@
 This repo now has a split production path:
 
 - Frontend: static Vite app on GitHub Pages.
-- Cutout API: FastAPI + rembg in a Docker container.
+- Sticker API: FastAPI + rembg + OpenRouter vision recognition in a Docker container.
 - Container registry: GitHub Container Registry.
 
 ## What is already automated
@@ -17,8 +17,10 @@ The Pages build uses these repository variables:
 
 - `VILO_CUTOUT_ENDPOINT`: public backend URL, for example `https://vilo-cutout-api.fly.dev/api/cutout`.
 - `VILO_REMOTE_CUTOUT_MODEL`: optional model name, default `isnet-general-use`.
+- `VILO_ANALYZE_ENDPOINT`: public food recognition URL, for example `https://vilo-cutout-api.fly.dev/api/analyze-food`.
 
 If `VILO_CUTOUT_ENDPOINT` is empty, the frontend falls back to browser-side background removal.
+If `VILO_ANALYZE_ENDPOINT` is empty, the frontend derives it from `VILO_CUTOUT_ENDPOINT` when the path ends in `/api/cutout`.
 
 For smoke tests before the final backend URL is baked into the Pages build, pass a runtime endpoint:
 
@@ -54,6 +56,7 @@ Fly needs an account token. Once `FLY_API_TOKEN` is available:
 
 ```powershell
 gh secret set FLY_API_TOKEN --repo zino-tea-ai/sway-nutrition-web
+gh secret set OPENROUTER_API_KEY --repo zino-tea-ai/sway-nutrition-web
 gh workflow run "Deploy cutout API to Fly" --repo zino-tea-ai/sway-nutrition-web -f app_name=vilo-cutout-api
 ```
 
@@ -61,6 +64,7 @@ After Fly returns the public host, wire the frontend to it:
 
 ```powershell
 gh variable set VILO_CUTOUT_ENDPOINT --repo zino-tea-ai/sway-nutrition-web --body "https://vilo-cutout-api.fly.dev/api/cutout"
+gh variable set VILO_ANALYZE_ENDPOINT --repo zino-tea-ai/sway-nutrition-web --body "https://vilo-cutout-api.fly.dev/api/analyze-food"
 gh variable set VILO_REMOTE_CUTOUT_MODEL --repo zino-tea-ai/sway-nutrition-web --body "isnet-general-use"
 gh workflow run "Deploy frontend to GitHub Pages" --repo zino-tea-ai/sway-nutrition-web
 ```
@@ -75,6 +79,11 @@ VILO_MAX_UPLOAD_MB=12
 VILO_MAX_INPUT_PIXELS=9000000
 VILO_CORS_ORIGINS=https://zino-tea-ai.github.io
 VILO_WARMUP=1
+VILO_ANALYZE_PROVIDER=openrouter
+OPENROUTER_API_KEY=<set as a host secret>
+VILO_OPENROUTER_MODEL=google/gemini-2.5-flash
+VILO_OPENROUTER_SITE_URL=https://zino-tea-ai.github.io/sway-nutrition-web/
+VILO_OPENROUTER_APP_TITLE=Vilo Sticker Lab
 ```
 
 ## Local production smoke test
@@ -82,5 +91,8 @@ VILO_WARMUP=1
 ```powershell
 $env:CUTOUT_PYTHON=".venv-cutout\Scripts\python.exe"
 $env:VILO_CUTOUT_MODEL="isnet-general-use"
+$env:VILO_ANALYZE_PROVIDER="mock"
 npm run qa:sticker:backend
 ```
+
+To smoke test OpenRouter locally, load `OPENROUTER_API_KEY`, set `VILO_ANALYZE_PROVIDER=openrouter`, start `npm run cutout:api`, then POST an image to `/api/analyze-food`.

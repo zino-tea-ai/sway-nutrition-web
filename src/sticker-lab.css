@@ -664,7 +664,7 @@
 .add-copy-button {
   position: absolute;
   left: 50%;
-  bottom: max(24px, calc(env(safe-area-inset-bottom) + 12px));
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 8px));
   z-index: 10;
   min-width: 118px;
   height: 42px;

@@ -42,6 +42,7 @@ async function runViewport(viewport) {
     const screenshots = [];
 
     await settle();
+    await waitForExpression(cdp, "!!document.querySelector('button[aria-label=\"Sample\"]')", 10000);
     layout.push({ phase: "camera", ...(await layoutReport(cdp)) });
     screenshots.push(await screenshot(cdp, viewport, "camera"));
 

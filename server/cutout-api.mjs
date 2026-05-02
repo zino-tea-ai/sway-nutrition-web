@@ -16,6 +16,16 @@ export function cutoutApiPlugin() {
           await writeJson(res, 500, { error: message });
         }
       });
+
+      server.middlewares.use("/api/analyze-food", async (req, res) => {
+        try {
+          const response = await createAnalyzeResponse(await nodeRequestToWebRequest(req, "/api/analyze-food"));
+          await writeWebResponse(res, response);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Analyze endpoint failed.";
+          await writeJson(res, 500, { error: message });
+        }
+      });
     },
   };
 }
@@ -39,6 +49,32 @@ export async function createCutoutResponse(request) {
   return jsonResponse(503, {
     code: "VILO_CUTOUT_PROVIDER_MISSING",
     error: "Set REMOVE_BG_API_KEY or CLIPDROP_API_KEY to enable the high quality cutout endpoint.",
+  });
+}
+
+export async function createAnalyzeResponse(request) {
+  if (request.method !== "POST") {
+    return jsonResponse(405, { error: "POST image multipart/form-data to this endpoint." });
+  }
+
+  const formData = await request.formData();
+  const image = formData.get("image") || formData.get("image_file");
+  if (!isBlobLike(image)) {
+    return jsonResponse(400, { error: "Missing image file field." });
+  }
+
+  return jsonResponse(200, {
+    ok: true,
+    name: "Master Kong Unsweetened Iced Black Tea",
+    localName: "康师傅无糖冰红茶",
+    type: "饮料 / 茶饮",
+    calories: 0,
+    protein: 0,
+    fiber: 0,
+    confidence: 0.86,
+    note: "无糖茶饮热量很低，适合记录为轻负担饮品；如果搭配正餐，继续看整体蛋白和纤维。",
+    provider: "vite-mock",
+    model: "sample",
   });
 }
 
@@ -138,14 +174,14 @@ function isBlobLike(value) {
   return value && typeof value.arrayBuffer === "function" && typeof value.type === "string";
 }
 
-async function nodeRequestToWebRequest(req) {
+async function nodeRequestToWebRequest(req, pathname = "/api/cutout") {
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
     if (Array.isArray(value)) headers.set(key, value.join(", "));
     else if (value !== undefined) headers.set(key, value);
   }
 
-  return new Request("http://127.0.0.1/api/cutout", {
+  return new Request(`http://127.0.0.1${pathname}`, {
     method: req.method || "GET",
     headers,
     body: req.method === "GET" || req.method === "HEAD" ? undefined : Readable.toWeb(req),

@@ -21,6 +21,7 @@ import "./sticker-lab.css";
 
 const CUTOUT_ENDPOINT_STORAGE_KEY = "vilo.cutoutEndpoint";
 const CUTOUT_MODEL_STORAGE_KEY = "vilo.cutoutModel";
+const ANALYZE_ENDPOINT_STORAGE_KEY = "vilo.analyzeEndpoint";
 const CUTOUT_MAX_SOURCE_EDGE = 1600;
 const CUTOUT_UPLOAD_TYPE = "image/jpeg";
 const CUTOUT_UPLOAD_QUALITY = 0.88;
@@ -666,19 +667,69 @@ function normalizeHttpEndpoint(value) {
 }
 
 async function analyzeFood(file) {
-  const endpoint = import.meta.env.VITE_VILO_ANALYZE_ENDPOINT;
+  const endpoint = getConfiguredAnalyzeEndpoint();
   if (!endpoint) return fallbackAnalysis;
 
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 26000);
   const formData = new FormData();
   formData.append("image", file);
-  const response = await fetch(endpoint, { method: "POST", body: formData });
-  if (!response.ok) return fallbackAnalysis;
-  const payload = await response.json();
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+    if (!response.ok) return fallbackAnalysis;
+    const payload = await response.json();
 
+    return normalizeAnalysisPayload(payload);
+  } catch {
+    return fallbackAnalysis;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function normalizeAnalysisPayload(payload) {
   return {
     ...fallbackAnalysis,
     ...payload,
+    calories: asNumber(payload?.calories, fallbackAnalysis.calories),
+    protein: asNumber(payload?.protein, fallbackAnalysis.protein),
+    fiber: asNumber(payload?.fiber, fallbackAnalysis.fiber),
+    confidence: asNumber(payload?.confidence, fallbackAnalysis.confidence),
   };
+}
+
+function asNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function getConfiguredAnalyzeEndpoint() {
+  const runtimeEndpoint = readRuntimeSetting("analyzeEndpoint", ANALYZE_ENDPOINT_STORAGE_KEY);
+  const explicitEndpoint = normalizeHttpEndpoint(runtimeEndpoint || import.meta.env.VITE_VILO_ANALYZE_ENDPOINT || "");
+  if (explicitEndpoint) return explicitEndpoint;
+
+  const inferredEndpoint = inferAnalyzeEndpoint(getConfiguredCutoutEndpoint());
+  if (inferredEndpoint) return inferredEndpoint;
+
+  return import.meta.env.DEV ? "/api/analyze-food" : "";
+}
+
+function inferAnalyzeEndpoint(cutoutEndpoint) {
+  if (!cutoutEndpoint) return "";
+  try {
+    const url = new URL(cutoutEndpoint, window.location.href);
+    const nextPath = url.pathname.replace(/\/api\/cutout\/?$/, "/api/analyze-food");
+    if (nextPath === url.pathname) return "";
+    url.pathname = nextPath;
+    url.search = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 }
 
 async function cleanStickerBlob(blob) {

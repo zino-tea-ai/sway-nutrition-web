@@ -10,6 +10,10 @@ primary_region = "nrt"
   VILO_MAX_INPUT_PIXELS = "9000000"
   VILO_CORS_ORIGINS = "https://zino-tea-ai.github.io,http://127.0.0.1:5188,http://localhost:5188"
   VILO_WARMUP = "1"
+  VILO_ANALYZE_PROVIDER = "openrouter"
+  VILO_OPENROUTER_MODEL = "google/gemini-2.5-flash"
+  VILO_OPENROUTER_SITE_URL = "https://zino-tea-ai.github.io/sway-nutrition-web/"
+  VILO_OPENROUTER_APP_TITLE = "Vilo Sticker Lab"
 
 [http_service]
   internal_port = 8787

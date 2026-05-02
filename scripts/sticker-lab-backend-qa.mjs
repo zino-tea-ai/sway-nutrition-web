@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 
@@ -17,6 +18,7 @@ const api = spawn(
     env: {
       ...process.env,
       VILO_CUTOUT_MODEL: model,
+      VILO_ANALYZE_PROVIDER: process.env.VILO_ANALYZE_PROVIDER || "mock",
       VILO_CORS_ORIGINS: `http://127.0.0.1:${vitePort},http://localhost:${vitePort}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -31,6 +33,7 @@ const vite = spawn(
       ...process.env,
       VITE_VILO_CUTOUT_ENDPOINT: `${cutoutUrl}/api/cutout`,
       VITE_VILO_REMOTE_CUTOUT_MODEL: model,
+      VITE_VILO_ANALYZE_ENDPOINT: `${cutoutUrl}/api/analyze-food`,
     },
     stdio: ["ignore", "pipe", "pipe"],
   },
@@ -41,6 +44,8 @@ const viteOutput = collectOutput(vite, "vite");
 
 try {
   await waitForHttp(`${cutoutUrl}/health`, 45000);
+  await assertContract(`${cutoutUrl}/api/contract`);
+  await assertAnalyze(`${cutoutUrl}/api/analyze-food`);
   await waitForHttp(targetUrl, 45000);
   await warmup(`${cutoutUrl}/api/warmup?model=${encodeURIComponent(model)}`);
 
@@ -69,6 +74,30 @@ async function warmup(url) {
   if (!response.ok) {
     const text = await response.text().catch(() => response.statusText);
     throw new Error(`Cutout warmup failed: ${response.status} ${text}`);
+  }
+}
+
+async function assertContract(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Contract failed: ${response.status}`);
+  const payload = await response.json();
+  if (!payload?.endpoints?.cutout || !payload?.endpoints?.analyzeFood) {
+    throw new Error("Contract is missing cutout or analyzeFood endpoint.");
+  }
+}
+
+async function assertAnalyze(url) {
+  const buffer = await readFile(path.resolve("src", "assets", "samples", "tea-bottle-source.jpg"));
+  const formData = new FormData();
+  formData.append("image", new Blob([buffer], { type: "image/jpeg" }), "tea-bottle-source.jpg");
+  const response = await fetch(url, { method: "POST", body: formData });
+  if (!response.ok) {
+    const text = await response.text().catch(() => response.statusText);
+    throw new Error(`Analyze failed: ${response.status} ${text}`);
+  }
+  const payload = await response.json();
+  for (const field of ["name", "localName", "type", "calories", "protein", "fiber", "confidence", "note"]) {
+    if (!(field in payload)) throw new Error(`Analyze response is missing ${field}.`);
   }
 }
 
