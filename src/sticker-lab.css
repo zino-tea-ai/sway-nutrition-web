@@ -64,19 +64,29 @@
 }
 
 .capture-flow {
-  background: #0d1112;
+  background:
+    linear-gradient(180deg, #0c0f10 0%, #070808 64%, #0d0e0f 100%);
   color: #ffffff;
 }
 
 .capture-media {
   position: absolute;
-  inset: 0;
+  top: max(52px, calc(env(safe-area-inset-top) + 42px));
+  left: 50%;
+  width: min(100%, calc((100svh - 190px) * 0.75));
+  max-width: var(--phone-width);
+  aspect-ratio: 3 / 4;
   display: grid;
   place-items: center;
   overflow: hidden;
+  border-radius: 0 0 34px 34px;
   background:
     radial-gradient(circle at 51% 43%, rgba(255, 255, 255, 0.18), transparent 28%),
     linear-gradient(160deg, #1f2a2d, #080a0b 72%);
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.36),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transform: translateX(-50%);
 }
 
 .capture-media video,
@@ -85,7 +95,8 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #050606;
 }
 
 .capture-flow.is-cutting .capture-photo {
@@ -163,7 +174,7 @@
   z-index: 5;
   width: min(260px, 62vw);
   aspect-ratio: 1.05;
-  top: 31%;
+  top: 45%;
   left: 50%;
   pointer-events: none;
   transform: translate(-50%, -50%);
@@ -248,7 +259,7 @@
   position: absolute;
   z-index: 4;
   left: 50%;
-  bottom: 118px;
+  bottom: 22px;
   display: inline-flex;
   align-items: center;
   gap: 8px;

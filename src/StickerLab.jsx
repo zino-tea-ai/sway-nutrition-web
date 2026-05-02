@@ -183,6 +183,7 @@ function StickerLab() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
+          aspectRatio: { ideal: 3 / 4 },
           width: { ideal: 1280 },
           height: { ideal: 1920 },
         },
@@ -210,24 +211,12 @@ function StickerLab() {
     const height = video.videoHeight || 1440;
     if (!video.videoWidth || !video.videoHeight) return;
 
-    const previewRect = video.getBoundingClientRect();
-    const crop = getCoverRect(width, height, previewRect.width || width, previewRect.height || height);
-    const outputSize = fitWithin(crop.sw, crop.sh, CUTOUT_MAX_SOURCE_EDGE);
+    const outputSize = fitWithin(width, height, CUTOUT_MAX_SOURCE_EDGE);
     canvas.width = outputSize.width;
     canvas.height = outputSize.height;
 
     const context = canvas.getContext("2d");
-    context.drawImage(
-      video,
-      crop.sx,
-      crop.sy,
-      crop.sw,
-      crop.sh,
-      0,
-      0,
-      outputSize.width,
-      outputSize.height,
-    );
+    context.drawImage(video, 0, 0, width, height, 0, 0, outputSize.width, outputSize.height);
     const blob = await canvasToBlob(canvas, CUTOUT_UPLOAD_TYPE, CUTOUT_UPLOAD_QUALITY);
     if (!blob) return;
     stopCamera();
@@ -416,9 +405,11 @@ function CaptureFlow({
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         hidden
-        onChange={(event) => onFile(event.target.files?.[0])}
+        onChange={(event) => {
+          onFile(event.target.files?.[0]);
+          event.target.value = "";
+        }}
       />
 
       {error && <p className="camera-error">{error}</p>}
