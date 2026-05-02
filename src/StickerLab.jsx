@@ -21,6 +21,9 @@ import "./sticker-lab.css";
 
 const CUTOUT_ENDPOINT_STORAGE_KEY = "vilo.cutoutEndpoint";
 const CUTOUT_MODEL_STORAGE_KEY = "vilo.cutoutModel";
+const CUTOUT_MAX_SOURCE_EDGE = 1600;
+const CUTOUT_UPLOAD_TYPE = "image/jpeg";
+const CUTOUT_UPLOAD_QUALITY = 0.88;
 const todayLabel = "5月03";
 
 const fallbackAnalysis = {
@@ -133,19 +136,21 @@ function StickerLab() {
 
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     if (stickerUrl) URL.revokeObjectURL(stickerUrl);
-
-    const nextSourceUrl = URL.createObjectURL(file);
-    setSourceUrl(nextSourceUrl);
+    setSourceUrl(null);
     setStickerUrl(null);
     setAnalysis(fallbackAnalysis);
+
+    const workingFile = options.cutoutBlob ? file : await prepareImageFile(file);
+    const nextSourceUrl = URL.createObjectURL(workingFile);
+    setSourceUrl(nextSourceUrl);
 
     try {
       const cutoutTask = options.cutoutBlob
         ? Promise.resolve(options.cutoutBlob)
-        : createCutout(file, (percent) => setProgress(percent));
+        : createCutout(workingFile, (percent) => setProgress(percent));
       const [cutoutBlob, nextAnalysis] = await Promise.all([
         cutoutTask,
-        analyzeFood(file),
+        analyzeFood(workingFile),
         delay(options.minimumCuttingMs || 0),
       ]);
       const cleanedBlob = await cleanStickerBlob(cutoutBlob);
@@ -196,23 +201,37 @@ function StickerLab() {
     setCameraStream(null);
   }
 
-  function captureFrame() {
+  async function captureFrame() {
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     if (!video || !canvas) return;
 
     const width = video.videoWidth || 1080;
     const height = video.videoHeight || 1440;
-    canvas.width = width;
-    canvas.height = height;
+    if (!video.videoWidth || !video.videoHeight) return;
+
+    const previewRect = video.getBoundingClientRect();
+    const crop = getCoverRect(width, height, previewRect.width || width, previewRect.height || height);
+    const outputSize = fitWithin(crop.sw, crop.sh, CUTOUT_MAX_SOURCE_EDGE);
+    canvas.width = outputSize.width;
+    canvas.height = outputSize.height;
 
     const context = canvas.getContext("2d");
-    context.drawImage(video, 0, 0, width, height);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      stopCamera();
-      processImage(new File([blob], `vilo-capture-${Date.now()}.png`, { type: "image/png" }));
-    }, "image/png");
+    context.drawImage(
+      video,
+      crop.sx,
+      crop.sy,
+      crop.sw,
+      crop.sh,
+      0,
+      0,
+      outputSize.width,
+      outputSize.height,
+    );
+    const blob = await canvasToBlob(canvas, CUTOUT_UPLOAD_TYPE, CUTOUT_UPLOAD_QUALITY);
+    if (!blob) return;
+    stopCamera();
+    processImage(new File([blob], `vilo-capture-${Date.now()}.jpg`, { type: CUTOUT_UPLOAD_TYPE }));
   }
 
   async function runSampleFlow() {
@@ -968,6 +987,47 @@ function getCoverRect(sourceWidth, sourceHeight, targetWidth, targetHeight) {
   }
   const sh = sourceWidth / targetRatio;
   return { sx: 0, sy: (sourceHeight - sh) / 2, sw: sourceWidth, sh };
+}
+
+function fitWithin(width, height, maxEdge) {
+  const scale = Math.min(1, maxEdge / Math.max(width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+async function prepareImageFile(file) {
+  if (!file?.type?.startsWith("image/")) return file;
+
+  let bitmap;
+  try {
+    bitmap = await createBitmap(file);
+  } catch {
+    return file;
+  }
+
+  try {
+    const outputSize = fitWithin(bitmap.width, bitmap.height, CUTOUT_MAX_SOURCE_EDGE);
+    const alreadySmallJpeg =
+      outputSize.width === bitmap.width &&
+      outputSize.height === bitmap.height &&
+      file.type === CUTOUT_UPLOAD_TYPE;
+    if (alreadySmallJpeg) return file;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = outputSize.width;
+    canvas.height = outputSize.height;
+    const context = canvas.getContext("2d");
+    context.drawImage(bitmap, 0, 0, outputSize.width, outputSize.height);
+    const blob = await canvasToBlob(canvas, CUTOUT_UPLOAD_TYPE, CUTOUT_UPLOAD_QUALITY, file);
+    if (blob === file) return file;
+
+    const name = file.name?.replace(/\.[^.]+$/, ".jpg") || `vilo-photo-${Date.now()}.jpg`;
+    return new File([blob], name, { type: blob.type || CUTOUT_UPLOAD_TYPE, lastModified: Date.now() });
+  } finally {
+    bitmap.close?.();
+  }
 }
 
 async function fetchBlob(url) {
