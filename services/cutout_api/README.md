@@ -52,3 +52,11 @@ copy services\cutout_api\fly.toml.example fly.toml
 fly launch --no-deploy
 fly deploy
 ```
+
+The repo also includes GitHub Actions for:
+
+- publishing the frontend to GitHub Pages;
+- publishing the cutout API image to GitHub Container Registry;
+- manually deploying the cutout API to Fly when `FLY_API_TOKEN` is configured.
+
+See `docs/DEPLOYMENT.md`.
