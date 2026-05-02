@@ -72,6 +72,7 @@ async function runViewport(viewport) {
 
     await clickByAria(cdp, "Confirm sticker");
     await waitForExpression(cdp, "!!document.querySelector('button[aria-label=\"Add to today\"]')", 10000);
+    await sleep(680);
     layout.push({ phase: "detail", ...(await layoutReport(cdp)) });
     screenshots.push(await screenshot(cdp, viewport, "detail"));
 
@@ -167,6 +168,7 @@ async function layoutReport(cdp) {
         width: window.innerWidth,
         height: window.innerHeight,
         scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight,
       };
       const app = rect(".app-viewport");
       const issues = [];
@@ -188,8 +190,31 @@ async function layoutReport(cdp) {
         addIssue(app.right > viewport.width + 0.5, "app viewport bleeds right");
       }
       addIssue(viewport.scrollWidth > viewport.width + 1, "horizontal overflow");
+      addIssue(!document.querySelector(".history-flow") && viewport.scrollHeight > viewport.height + 1, "unexpected vertical overflow");
 
       const bottom = rect(".capture-bottom");
+      const captureMedia = rect(".capture-media");
+      const focusFrame = rect(".focus-corners");
+      const emptyTitle = rect(".empty-camera h1");
+      const emptyCaption = rect(".empty-camera p");
+      if (captureMedia && app) {
+        addIssue(captureMedia.left < app.left - 0.5, "capture media bleeds left");
+        addIssue(captureMedia.right > app.right + 0.5, "capture media bleeds right");
+        addIssue(captureMedia.top < app.top - 0.5, "capture media bleeds top");
+      }
+      if (captureMedia && bottom) {
+        verticalGap(captureMedia, bottom, 18, "capture media/controls");
+      }
+      if (focusFrame && captureMedia) {
+        addIssue(focusFrame.left < captureMedia.left - 0.5, "focus frame bleeds left");
+        addIssue(focusFrame.right > captureMedia.right + 0.5, "focus frame bleeds right");
+        addIssue(focusFrame.top < captureMedia.top - 0.5, "focus frame bleeds top");
+        addIssue(focusFrame.bottom > captureMedia.bottom + 0.5, "focus frame bleeds bottom");
+      }
+      if (focusFrame && emptyTitle) {
+        addIssue(emptyTitle.top < focusFrame.bottom + 12, "empty title overlaps focus frame");
+      }
+      verticalGap(emptyTitle, emptyCaption, 7, "empty title/caption");
       if (bottom && app) {
         addIssue(bottom.left < app.left - 0.5, "capture controls bleed left");
         addIssue(bottom.right > app.right + 0.5, "capture controls bleed right");
@@ -226,6 +251,10 @@ async function layoutReport(cdp) {
         viewport,
         rects: {
           app,
+          captureMedia,
+          focusFrame,
+          emptyTitle,
+          emptyCaption,
           bottom,
           shutter: rect(".shutter-button"),
           confirmStage: rect(".confirm-stage"),
