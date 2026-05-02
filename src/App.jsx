@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Barcode,
   Camera,
   Check,
   ChevronRight,
@@ -9,7 +10,9 @@ import {
   Dumbbell,
   Flame,
   Gauge,
+  Keyboard,
   Leaf,
+  Mic2,
   Moon,
   Plus,
   ScanLine,
@@ -317,6 +320,16 @@ const UI = {
     mealsToday: "Meals today",
     mealSlots: "Meal slots",
     mealSlotsBody: "Log by the moment you actually eat. Tap a meal to see the scorecard.",
+    quickCapture: "Log in 10 seconds",
+    quickCaptureBody: "Say it, snap it, type it, or scan it. The app turns one messy meal into a clear result.",
+    voiceInput: "Voice",
+    photoInput: "Photo",
+    textInput: "Text",
+    barcodeInput: "Barcode",
+    liveResult: "Meal result",
+    whyChanged: "Why the score moved",
+    nextMeal: "Next meal",
+    stickerJournal: "Sticker journal",
     goalLens: "Goal lens",
     tuneGoal: "Change goal",
     logged: "logged",
@@ -339,7 +352,7 @@ const UI = {
     raw: { kcal: "kcal", protein: "protein", fiber: "fiber" },
     inspectorNext: "Next move",
     logAnother: "Log another meal",
-    modalTitle: "Choose food, then see the score before saving",
+    modalTitle: "Pick food, preview score, save",
     meal: "Meal",
     context: "Context",
     preview: "Preview",
@@ -379,6 +392,16 @@ const UI = {
     mealsToday: "今天的餐",
     mealSlots: "按餐次记录",
     mealSlotsBody: "按照真实吃饭的时刻记录。点一餐，就看到分数卡。",
+    quickCapture: "10 秒记录一餐",
+    quickCaptureBody: "可以说、拍、打字或扫码。产品把一餐混乱的信息翻译成清晰结果。",
+    voiceInput: "语音",
+    photoInput: "拍照",
+    textInput: "文字",
+    barcodeInput: "扫码",
+    liveResult: "单餐结果",
+    whyChanged: "分数为什么变了",
+    nextMeal: "下一餐",
+    stickerJournal: "贴纸日记",
     goalLens: "目标镜头",
     tuneGoal: "调整目标",
     logged: "已记录",
@@ -401,7 +424,7 @@ const UI = {
     raw: { kcal: "千卡", protein: "蛋白质", fiber: "纤维" },
     inspectorNext: "下一步",
     logAnother: "再记录一餐",
-    modalTitle: "先选食物，保存前就看到分数",
+    modalTitle: "选择食物，预览分数，再保存",
     meal: "餐食",
     context: "场景",
     preview: "预览",
@@ -984,6 +1007,10 @@ function TodayView({
     mealType,
     entries: entries.filter((entry) => entry.mealType === mealType),
   }));
+  const selectedEntry = entries.find((entry) => entry.id === selectedEntryId) ?? entries[0];
+  const selectedAssessment = selectedEntry
+    ? evaluateMeal(templateById[selectedEntry.templateId], activeGoal, selectedEntry)
+    : day.assessments[0];
   return (
     <section className="view today-view app-home">
       <section className="today-command">
@@ -997,6 +1024,7 @@ function TodayView({
             </button>
             <span>{entries.length} {copy.logged}</span>
           </div>
+          <QuickCaptureStrip copy={copy} onLog={onLog} />
         </div>
 
         <div className="command-score">
@@ -1037,6 +1065,8 @@ function TodayView({
               />
             ))}
           </div>
+
+          <TodayResultCard assessment={selectedAssessment} onLog={onLog} locale={locale} copy={copy} />
         </div>
 
         <aside className="goal-panel">
@@ -1074,6 +1104,78 @@ function TodayView({
           </div>
         </aside>
       </section>
+    </section>
+  );
+}
+
+function QuickCaptureStrip({ copy, onLog }) {
+  const modes = [
+    { label: copy.voiceInput, icon: Mic2 },
+    { label: copy.photoInput, icon: Camera },
+    { label: copy.textInput, icon: Keyboard },
+    { label: copy.barcodeInput, icon: Barcode },
+  ];
+
+  return (
+    <div className="quick-capture-strip">
+      <div>
+        <span>{copy.quickCapture}</span>
+        <p>{copy.quickCaptureBody}</p>
+      </div>
+      <div className="capture-modes">
+        {modes.map((mode) => {
+          const Icon = mode.icon;
+          return (
+            <button key={mode.label} type="button" onClick={onLog}>
+              <Icon size={16} />
+              <span>{mode.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TodayResultCard({ assessment, onLog, locale, copy }) {
+  if (!assessment) return null;
+  const meal = mealText(assessment.template, locale);
+  const next = nextActionText(assessment.nextAction, locale, assessment.goal);
+  const topMovers = assessment.movers.slice(0, 3);
+
+  return (
+    <section className="today-result-card" aria-label={copy.liveResult}>
+      <div className="result-visual">
+        <ImageStack images={assessment.template.images} />
+      </div>
+      <div className="result-copy">
+        <p className="eyebrow">{copy.liveResult}</p>
+        <div className="result-title-row">
+          <h3>{meal.name}</h3>
+          <div className="result-score-pill">
+            <strong>{assessment.score}</strong>
+            <span>{copy.grades[assessment.grade]}</span>
+          </div>
+        </div>
+        <p>{meal.description}</p>
+        <div className="result-movers" aria-label={copy.whyChanged}>
+          {topMovers.map((mover) => (
+            <span
+              key={`${mover.label}-${mover.points}`}
+              className={mover.points >= 0 ? "is-positive" : "is-negative"}
+            >
+              {formatSigned(mover.points)} {moverLabel(mover.label, locale)}
+            </span>
+          ))}
+        </div>
+        <div className="result-next">
+          <span>{copy.nextMeal}</span>
+          <strong>{next.title}</strong>
+        </div>
+      </div>
+      <button className="wide-action result-action" type="button" onClick={onLog}>
+        {copy.logNextMeal} <Plus size={17} />
+      </button>
     </section>
   );
 }
@@ -1147,22 +1249,24 @@ function SlotEntryRow({ entry, assessment, locale, copy, selected, onSelect }) {
   return (
     <button className={`slot-entry-row ${selected ? "is-selected" : ""}`} type="button" onClick={onSelect}>
       <span className="slot-time">{entry.time}</span>
-      <ImageStack images={assessment.template.images} compact />
       <span className="slot-food">
         <strong>{meal.name}</strong>
         <small>{portionText(entry.portion, locale)} {locale === "zh" ? "份量" : "portion"}</small>
-      </span>
-      <span className="slot-mover">
-        {topMover
-          ? `${formatSigned(topMover.points)} ${moverLabel(topMover.label, locale)}`
-          : locale === "zh"
-            ? "暂无影响项"
-            : "No mover"}
       </span>
       <span className="slot-row-score">
         <strong>{assessment.score}</strong>
         <small>{copy.grades[assessment.grade]}</small>
       </span>
+      <div className="slot-entry-detail">
+        <ImageStack images={assessment.template.images} compact />
+        <span className="slot-mover">
+          {topMover
+            ? `${formatSigned(topMover.points)} ${moverLabel(topMover.label, locale)}`
+            : locale === "zh"
+              ? "暂无影响项"
+              : "No mover"}
+        </span>
+      </div>
     </button>
   );
 }
