@@ -15,12 +15,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Configure OpenRouter secret
-        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
-        run: >
-          flyctl secrets set
-          OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
-          --app "${{ inputs.app_name }}"
-          --stage
+        run: |
+          if [ -z "${OPENROUTER_API_KEY}" ]; then
+            echo "OPENROUTER_API_KEY is not configured; skipping Fly secret sync."
+            exit 0
+          fi
+
+          flyctl secrets set \
+            OPENROUTER_API_KEY="${OPENROUTER_API_KEY}" \
+            --app "${{ inputs.app_name }}" \
+            --stage
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
