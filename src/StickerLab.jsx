@@ -213,7 +213,7 @@ function StickerLab() {
     }, "image/png");
   }
 
-async function runSampleFlow() {
+  async function runSampleFlow() {
     const file = await makeSampleBottleFile();
     if (shouldUsePrebuiltSampleCutout()) {
       const cutoutBlob = await fetchBlob(sampleBottleCutout);
@@ -590,7 +590,11 @@ async function createRemoteCutout(endpoint, file, onProgress) {
   try {
     const formData = new FormData();
     formData.append("image", file);
-    const response = await fetch(endpoint, { method: "POST", body: formData, signal: controller.signal });
+    const response = await fetch(resolveCutoutEndpoint(endpoint), {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
     onProgress(76);
     if (!response.ok) throw new Error("High quality cutout failed.");
     const contentType = response.headers.get("content-type") || "";
@@ -604,6 +608,13 @@ async function createRemoteCutout(endpoint, file, onProgress) {
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+function resolveCutoutEndpoint(endpoint) {
+  const url = new URL(endpoint, window.location.href);
+  const model = import.meta.env.VITE_VILO_REMOTE_CUTOUT_MODEL;
+  if (model) url.searchParams.set("model", model);
+  return url.toString();
 }
 
 async function analyzeFood(file) {

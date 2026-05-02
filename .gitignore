@@ -1,6 +1,10 @@
 node_modules/
 dist/
 qa-screens/
+.venv-cutout/
+services/cutout_api/.u2net/
+__pycache__/
+*.pyc
 
 *.log
 .DS_Store

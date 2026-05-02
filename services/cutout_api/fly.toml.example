@@ -1,0 +1,24 @@
+app = "vilo-cutout-api"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "services/cutout_api/Dockerfile"
+
+[env]
+  VILO_CUTOUT_MODEL = "isnet-general-use"
+  VILO_MAX_UPLOAD_MB = "12"
+  VILO_MAX_INPUT_PIXELS = "9000000"
+  VILO_CORS_ORIGINS = "https://zino-tea-ai.github.io,http://127.0.0.1:5188"
+  VILO_WARMUP = "1"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 4
+    hard_limit = 8
