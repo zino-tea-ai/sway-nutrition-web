@@ -10,6 +10,7 @@
     "qa:sticker": "node scripts/sticker-lab-qa.mjs",
     "qa:sticker:api": "node scripts/sticker-lab-api-qa.mjs",
     "qa:sticker:backend": "node scripts/sticker-lab-backend-qa.mjs",
+    "qa:vercel:analyze": "node scripts/vercel-analyze-api-smoke.mjs",
     "bench:cutout": "node scripts/cutout-model-benchmark.mjs",
     "cutout:api": ".venv-cutout\\Scripts\\python.exe -m uvicorn services.cutout_api.app:app --host 127.0.0.1 --port 8787"
   },

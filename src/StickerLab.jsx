@@ -715,7 +715,12 @@ function getConfiguredAnalyzeEndpoint() {
   const inferredEndpoint = inferAnalyzeEndpoint(getConfiguredCutoutEndpoint());
   if (inferredEndpoint) return inferredEndpoint;
 
-  return import.meta.env.DEV ? "/api/analyze-food" : "";
+  if (import.meta.env.DEV || shouldUseSameOriginApi()) return "/api/analyze-food";
+  return "";
+}
+
+function shouldUseSameOriginApi() {
+  return Boolean(window.location.hostname && !window.location.hostname.endsWith("github.io"));
 }
 
 function inferAnalyzeEndpoint(cutoutEndpoint) {

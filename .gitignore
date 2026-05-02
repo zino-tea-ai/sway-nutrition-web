@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.vercel/
 qa-screens/
 .venv-cutout/
 services/cutout_api/.u2net/

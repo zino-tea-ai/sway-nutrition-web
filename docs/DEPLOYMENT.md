@@ -4,6 +4,7 @@ This repo now has a split production path:
 
 - Frontend: static Vite app on GitHub Pages.
 - Sticker API: FastAPI + rembg + OpenRouter vision recognition in a Docker container.
+- Vercel dev deploy: static Vite app + `/api/analyze-food` OpenRouter proxy. This is good for a stable shareable prototype while the heavy cutout API still waits for a container host.
 - Container registry: GitHub Container Registry.
 
 ## What is already automated
@@ -21,6 +22,7 @@ The Pages build uses these repository variables:
 
 If `VILO_CUTOUT_ENDPOINT` is empty, the frontend falls back to browser-side background removal.
 If `VILO_ANALYZE_ENDPOINT` is empty, the frontend derives it from `VILO_CUTOUT_ENDPOINT` when the path ends in `/api/cutout`.
+On Vercel, if both are empty, the frontend uses same-origin `/api/analyze-food` for recognition and browser-side cutout for lifting.
 
 For smoke tests before the final backend URL is baked into the Pages build, pass a runtime endpoint:
 
@@ -29,6 +31,44 @@ https://zino-tea-ai.github.io/sway-nutrition-web/?cutoutEndpoint=https%3A%2F%2Fe
 ```
 
 The runtime endpoint is stored in local storage. Clear it with `?cutoutEndpoint=`.
+
+## Vercel development deploy
+
+Use this path when you want a stable public URL quickly and do not have a Fly/RunPod container account ready yet.
+
+```powershell
+npm run build
+npm run qa:vercel:analyze
+npx vercel
+```
+
+When Vercel asks:
+
+- Set up and deploy: `Y`
+- Which scope: choose your account/team
+- Link to existing project: usually `N` for the first deploy
+- Project name: `sway-nutrition-web` or `vilo-sticker-lab`
+- Build command: `npm run build`
+- Output directory: `dist`
+
+Then set the server-side OpenRouter key in Vercel:
+
+```powershell
+npx vercel env add OPENROUTER_API_KEY production
+npx vercel env add OPENROUTER_API_KEY preview
+npx vercel --prod
+```
+
+Do not set `OPENROUTER_API_KEY` as a `VITE_` variable. It must stay server-side only.
+
+The Vercel URL should support:
+
+```text
+https://<your-vercel-app>.vercel.app/sticker-lab
+https://<your-vercel-app>.vercel.app/api/analyze-food
+```
+
+This Vercel path does not run the Python `rembg` container. For faster and more consistent high-quality cutout, deploy the Docker API below and set `VILO_CUTOUT_ENDPOINT`.
 
 ## First deploy
 
