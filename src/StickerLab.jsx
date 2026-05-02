@@ -1,4 +1,4 @@
-import { removeBackground } from "@imgly/background-removal";
+import { preload, removeBackground } from "@imgly/background-removal";
 import {
   Camera,
   Check,
@@ -15,6 +15,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 import avocado from "./assets/stickers/avocado.png";
 import honey from "./assets/stickers/honey_pot.png";
+import sampleBottleCutout from "./assets/samples/tea-bottle-cutout.png";
 import sampleBottlePhoto from "./assets/samples/tea-bottle-source.jpg";
 import "./sticker-lab.css";
 
@@ -29,6 +30,11 @@ const fallbackAnalysis = {
   fiber: 0,
   confidence: 0.86,
   note: "无糖茶饮热量很低，适合记录为轻负担饮品；如果搭配正餐，继续看整体蛋白和纤维。",
+};
+
+const cutoutConfig = {
+  model: import.meta.env.VITE_VILO_CUTOUT_MODEL || "isnet_quint8",
+  output: { format: "image/png", type: "foreground" },
 };
 
 const seedHistory = [
@@ -52,6 +58,7 @@ function StickerLab() {
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const captureCanvasRef = useRef(null);
+  const revealTimerRef = useRef(0);
   const [phase, setPhase] = useState("camera");
   const [sourceUrl, setSourceUrl] = useState(null);
   const [stickerUrl, setStickerUrl] = useState(null);
@@ -69,6 +76,36 @@ function StickerLab() {
   }, [cameraStream]);
 
   useEffect(() => {
+    if (import.meta.env.VITE_VILO_CUTOUT_ENDPOINT) return undefined;
+
+    let cancelled = false;
+    const warmModel = () => {
+      preload(cutoutConfig).catch(() => {
+        if (!cancelled) setProgress((value) => Math.max(value, 0));
+      });
+    };
+    const idleId =
+      "requestIdleCallback" in window
+        ? window.requestIdleCallback(warmModel, { timeout: 1400 })
+        : window.setTimeout(warmModel, 900);
+
+    return () => {
+      cancelled = true;
+      if ("cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      } else {
+        window.clearTimeout(idleId);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(revealTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (sourceUrl) URL.revokeObjectURL(sourceUrl);
       if (stickerUrl) URL.revokeObjectURL(stickerUrl);
@@ -76,12 +113,21 @@ function StickerLab() {
     };
   }, [sourceUrl, stickerUrl, cameraStream]);
 
-  async function processImage(file) {
+  async function processImage(file, options = {}) {
     if (!file) return;
 
     setError("");
     setProgress(4);
     setPhase("cutting");
+    window.clearTimeout(revealTimerRef.current);
+    const startedAt = performance.now();
+    const progressTimer = window.setInterval(() => {
+      setProgress((value) => {
+        if (value < 28) return Math.min(28, value + 8);
+        if (value < 64) return Math.min(64, value + 4);
+        return Math.min(91, value + 1);
+      });
+    }, 160);
 
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     if (stickerUrl) URL.revokeObjectURL(stickerUrl);
@@ -92,9 +138,13 @@ function StickerLab() {
     setAnalysis(fallbackAnalysis);
 
     try {
+      const cutoutTask = options.cutoutBlob
+        ? Promise.resolve(options.cutoutBlob)
+        : createCutout(file, (percent) => setProgress(percent));
       const [cutoutBlob, nextAnalysis] = await Promise.all([
-        createCutout(file, (percent) => setProgress(percent)),
+        cutoutTask,
         analyzeFood(file),
+        delay(options.minimumCuttingMs || 0),
       ]);
       const cleanedBlob = await cleanStickerBlob(cutoutBlob);
       const nextStickerUrl = URL.createObjectURL(cleanedBlob);
@@ -102,11 +152,16 @@ function StickerLab() {
       setAnalysis(nextAnalysis);
       setBurstKey((value) => value + 1);
       setProgress(100);
-      setPhase("confirm");
+      setPhase("revealing");
+      const elapsed = performance.now() - startedAt;
+      const revealDelay = elapsed < 650 ? 920 : 760;
+      revealTimerRef.current = window.setTimeout(() => setPhase("confirm"), revealDelay);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the sticker.");
       setProgress(0);
       setPhase("camera");
+    } finally {
+      window.clearInterval(progressTimer);
     }
   }
 
@@ -159,12 +214,13 @@ function StickerLab() {
   }
 
   async function runSampleFlow() {
-    const file = await makeSampleBottleFile();
-    processImage(file);
+    const [file, cutoutBlob] = await Promise.all([makeSampleBottleFile(), fetchBlob(sampleBottleCutout)]);
+    processImage(file, { cutoutBlob, minimumCuttingMs: 1150 });
   }
 
   function resetFlow() {
     stopCamera();
+    window.clearTimeout(revealTimerRef.current);
     setPhase("camera");
     setProgress(0);
     setError("");
@@ -217,9 +273,10 @@ function StickerLab() {
           />
         ) : null}
 
-        {phase === "confirm" && (
+        {(phase === "revealing" || phase === "confirm") && (
           <ConfirmFlow
             {...commonProps}
+            isRevealing={phase === "revealing"}
             onConfirm={() => setPhase("detail")}
             onRetake={resetFlow}
           />
@@ -297,14 +354,32 @@ function CaptureFlow({
       </div>
 
       <div className="capture-bottom">
-        <button type="button" className="ghost-button" onClick={() => fileInputRef.current?.click()} aria-label="Upload">
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={phase === "cutting"}
+          onClick={() => fileInputRef.current?.click()}
+          aria-label="Upload"
+        >
           <Upload size={18} />
           <span>Upload</span>
         </button>
-        <button type="button" className="shutter-button" onClick={onCamera} aria-label="Capture">
+        <button
+          type="button"
+          className="shutter-button"
+          disabled={phase === "cutting"}
+          onClick={onCamera}
+          aria-label="Capture"
+        >
           <Camera size={27} />
         </button>
-        <button type="button" className="ghost-button" onClick={onSample} aria-label="Sample">
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={phase === "cutting"}
+          onClick={onSample}
+          aria-label="Sample"
+        >
           <Sparkles size={18} />
           <span>Sample</span>
         </button>
@@ -324,9 +399,9 @@ function CaptureFlow({
   );
 }
 
-function ConfirmFlow({ burstKey, onBack, onConfirm, onRetake, sourceUrl, stickerUrl }) {
+function ConfirmFlow({ burstKey, isRevealing, onBack, onConfirm, onRetake, sourceUrl, stickerUrl }) {
   return (
-    <section className="confirm-flow">
+    <section className={`confirm-flow ${isRevealing ? "is-revealing" : ""}`}>
       {sourceUrl && <img src={sourceUrl} alt="" className="confirm-ghost-photo" />}
       {sourceUrl && <PhotoDissolve key={`confirm-${sourceUrl}`} src={sourceUrl} compact />}
       <TopDateBar onBack={onBack} variant="dark" />
@@ -339,6 +414,13 @@ function ConfirmFlow({ burstKey, onBack, onConfirm, onRetake, sourceUrl, sticker
           </>
         )}
       </div>
+
+      {isRevealing && (
+        <div className="reveal-pill" aria-live="polite">
+          <Sparkles size={14} />
+          <span>subject lifted</span>
+        </div>
+      )}
 
       <div className="confirm-actions">
         <button type="button" className="soft-circle" onClick={onRetake} aria-label="Retake">
@@ -374,6 +456,18 @@ function DetailFlow({ analysis, onAdd, onBack, onDelete, onRetake, stickerUrl })
         </div>
         <p>{analysis.localName}</p>
 
+        <div className="detail-actions">
+          <button type="button" className="soft-circle" onClick={onRetake} aria-label="Back to sticker">
+            <RotateCcw size={20} />
+          </button>
+          <button type="button" className="main-check" onClick={onAdd} aria-label="Add to today">
+            <Check size={26} />
+          </button>
+          <button type="button" className="soft-circle" onClick={onDelete} aria-label="Delete">
+            <X size={20} />
+          </button>
+        </div>
+
         <div className="nutrition-ribbon" aria-label="Nutrition estimate">
           <span>{analysis.type}</span>
           <strong>~{analysis.calories} kcal</strong>
@@ -386,18 +480,6 @@ function DetailFlow({ analysis, onAdd, onBack, onDelete, onRetake, stickerUrl })
           <span>{analysis.note}</span>
         </div>
       </article>
-
-      <div className="detail-actions">
-        <button type="button" className="soft-circle" onClick={onRetake} aria-label="Back to sticker">
-          <RotateCcw size={20} />
-        </button>
-        <button type="button" className="main-check" onClick={onAdd} aria-label="Add to today">
-          <Check size={26} />
-        </button>
-        <button type="button" className="soft-circle" onClick={onDelete} aria-label="Delete">
-          <X size={20} />
-        </button>
-      </div>
 
       <button type="button" className="add-copy-button" onClick={onAdd}>
         加入今天
@@ -490,8 +572,7 @@ async function createCutout(file, onProgress) {
   }
 
   return removeBackground(file, {
-    model: "isnet_fp16",
-    output: { format: "image/png", type: "foreground" },
+    ...cutoutConfig,
     progress: (_key, current, total) => {
       if (!total) return;
       onProgress(Math.min(88, Math.round((current / total) * 72) + 10));
@@ -844,6 +925,10 @@ function canvasToBlob(canvas, type, quality, fallback) {
   return new Promise((resolve) => {
     canvas.toBlob((blob) => resolve(blob || fallback), type, quality);
   });
+}
+
+function delay(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function stopStream(stream) {
