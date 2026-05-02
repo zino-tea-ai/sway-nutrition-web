@@ -198,6 +198,11 @@
   transform: translate(-50%, -50%) scale(0.9);
 }
 
+.capture-flow.is-cutting .focus-corners {
+  opacity: 0.72;
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
 .focus-corners i {
   position: absolute;
   width: 38px;
@@ -240,7 +245,9 @@
 
 .cutting-layer,
 .photo-dissolve,
-.cutting-wash {
+.cutting-wash,
+.scan-beam,
+.edge-glow {
   position: absolute;
   inset: 0;
 }
@@ -248,7 +255,9 @@
 .cutting-layer {
   z-index: 7;
   overflow: hidden;
-  background: linear-gradient(45deg, rgba(246, 244, 237, 0.04), rgba(246, 244, 237, 0.5));
+  background:
+    radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.22));
 }
 
 .photo-dissolve {
@@ -261,10 +270,34 @@
 .cutting-wash {
   z-index: 1;
   background:
-    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.28), transparent 30%),
-    linear-gradient(45deg, rgba(245, 241, 229, 0), rgba(245, 241, 229, 0.78));
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.18), transparent 30%),
+    linear-gradient(45deg, rgba(245, 241, 229, 0), rgba(245, 241, 229, 0.46));
   mask-image: linear-gradient(45deg, transparent 16%, black 45%, black 72%, transparent 92%);
   animation: washAcross 1.45s cubic-bezier(0.19, 1, 0.22, 1) infinite;
+}
+
+.scan-beam {
+  z-index: 3;
+  height: 2px;
+  top: var(--scan-progress);
+  bottom: auto;
+  background: linear-gradient(90deg, transparent 6%, rgba(255, 255, 255, 0.95), transparent 94%);
+  box-shadow:
+    0 -16px 34px rgba(255, 255, 255, 0.1),
+    0 0 28px rgba(255, 255, 255, 0.34);
+  transition: top 240ms cubic-bezier(0.2, 1, 0.22, 1);
+}
+
+.edge-glow {
+  z-index: 2;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.18) 1px, transparent 1px);
+  background-size: 34px 34px;
+  opacity: 0.18;
+  mask-image: radial-gradient(circle at 50% 45%, black 0 32%, transparent 64%);
+  animation: edgeBreath 1.8s ease-in-out infinite;
 }
 
 .scan-pill {
@@ -273,9 +306,12 @@
   left: 50%;
   bottom: 22px;
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 9px 13px;
+  min-width: 184px;
+  padding: 9px 13px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
   color: #1d2022;
@@ -283,6 +319,25 @@
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
   transform: translateX(-50%);
   backdrop-filter: blur(18px);
+}
+
+.scan-pill i {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(17, 18, 20, 0.12);
+}
+
+.scan-pill i::after {
+  position: absolute;
+  inset: 0;
+  width: var(--progress);
+  content: "";
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c58a3c, #fff4c4);
+  transition: width 220ms cubic-bezier(0.2, 1, 0.22, 1);
 }
 
 .capture-bottom {
@@ -813,6 +868,19 @@
   100% {
     opacity: 0;
     transform: translate(24%, -34%) rotate(-12deg);
+  }
+}
+
+@keyframes edgeBreath {
+  0%,
+  100% {
+    opacity: 0.12;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.28;
+    transform: scale(1.025);
   }
 }
 

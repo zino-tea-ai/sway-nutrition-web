@@ -1,4 +1,3 @@
-import { preload, removeBackground } from "@imgly/background-removal";
 import {
   Camera,
   Check,
@@ -43,6 +42,8 @@ const cutoutConfig = {
   output: { format: "image/png", type: "foreground" },
 };
 
+let backgroundRemovalModulePromise;
+
 const seedHistory = [
   {
     id: "seed-tea",
@@ -68,6 +69,7 @@ function StickerLab() {
   const [phase, setPhase] = useState("camera");
   const [sourceUrl, setSourceUrl] = useState(null);
   const [stickerUrl, setStickerUrl] = useState(null);
+  const [maskUrl, setMaskUrl] = useState(null);
   const [analysis, setAnalysis] = useState(fallbackAnalysis);
   const [cameraStream, setCameraStream] = useState(null);
   const [progress, setProgress] = useState(0);
@@ -82,89 +84,76 @@ function StickerLab() {
   }, [cameraStream]);
 
   useEffect(() => {
-    if (getConfiguredCutoutEndpoint()) return undefined;
-
-    let cancelled = false;
-    const warmModel = () => {
-      preload(cutoutConfig).catch(() => {
-        if (!cancelled) setProgress((value) => Math.max(value, 0));
-      });
-    };
-    const idleId =
-      "requestIdleCallback" in window
-        ? window.requestIdleCallback(warmModel, { timeout: 1400 })
-        : window.setTimeout(warmModel, 900);
-
-    return () => {
-      cancelled = true;
-      if ("cancelIdleCallback" in window) {
-        window.cancelIdleCallback(idleId);
-      } else {
-        window.clearTimeout(idleId);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     return () => {
       window.clearTimeout(revealTimerRef.current);
     };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-      if (stickerUrl) URL.revokeObjectURL(stickerUrl);
-      stopStream(cameraStream);
-    };
-  }, [sourceUrl, stickerUrl, cameraStream]);
+  useEffect(() => () => revokeUrl(sourceUrl), [sourceUrl]);
+
+  useEffect(() => () => revokeUrl(stickerUrl), [stickerUrl]);
+
+  useEffect(() => () => revokeUrl(maskUrl), [maskUrl]);
+
+  useEffect(() => () => stopStream(cameraStream), [cameraStream]);
 
   async function processImage(file, options = {}) {
     if (!file) return;
 
+    const previewUrl = URL.createObjectURL(file);
     setError("");
-    setProgress(4);
-    setPhase("cutting");
+    setProgress(2);
     window.clearTimeout(revealTimerRef.current);
+    revokeUrl(sourceUrl);
+    revokeUrl(stickerUrl);
+    revokeUrl(maskUrl);
+    setSourceUrl(previewUrl);
+    setStickerUrl(null);
+    setMaskUrl(null);
+    setAnalysis(fallbackAnalysis);
+    setPhase("cutting");
+
     const startedAt = performance.now();
     const progressTimer = window.setInterval(() => {
       setProgress((value) => {
-        if (value < 28) return Math.min(28, value + 8);
-        if (value < 64) return Math.min(64, value + 4);
-        return Math.min(91, value + 1);
+        if (value < 18) return Math.min(18, value + 5);
+        if (value < 48) return Math.min(48, value + 3);
+        if (value < 78) return Math.min(78, value + 2);
+        return Math.min(94, value + 1);
       });
-    }, 160);
-
-    if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-    if (stickerUrl) URL.revokeObjectURL(stickerUrl);
-    setSourceUrl(null);
-    setStickerUrl(null);
-    setAnalysis(fallbackAnalysis);
-
-    const workingFile = options.cutoutBlob ? file : await prepareImageFile(file);
-    const nextSourceUrl = URL.createObjectURL(workingFile);
-    setSourceUrl(nextSourceUrl);
+    }, 180);
 
     try {
+      await delay(120);
+      const workingFile = options.cutoutBlob ? file : await prepareImageFile(file);
+      if (workingFile !== file) {
+        const nextSourceUrl = URL.createObjectURL(workingFile);
+        setSourceUrl((currentUrl) => {
+          if (currentUrl) URL.revokeObjectURL(currentUrl);
+          return nextSourceUrl;
+        });
+      }
       const cutoutTask = options.cutoutBlob
         ? Promise.resolve(options.cutoutBlob)
         : createCutout(workingFile, (percent) => setProgress(percent));
+      const minimumCuttingMs = options.minimumCuttingMs ?? 1500;
       const [cutoutBlob, nextAnalysis] = await Promise.all([
         cutoutTask,
         analyzeFood(workingFile),
-        delay(options.minimumCuttingMs || 0),
+        delay(minimumCuttingMs),
       ]);
+      const nextMaskUrl = URL.createObjectURL(cutoutBlob);
       const cleanedBlob = await cleanStickerBlob(cutoutBlob);
       const nextStickerUrl = URL.createObjectURL(cleanedBlob);
+      setMaskUrl(nextMaskUrl);
       setStickerUrl(nextStickerUrl);
       setAnalysis(nextAnalysis);
       setBurstKey((value) => value + 1);
       setProgress(100);
       setPhase("revealing");
-      const elapsed = performance.now() - startedAt;
-      const revealDelay = elapsed < 650 ? 920 : 760;
-      revealTimerRef.current = window.setTimeout(() => setPhase("confirm"), revealDelay);
+      revealTimerRef.current = window.setTimeout(() => setPhase("confirm"), 1380);
     } catch (err) {
+      URL.revokeObjectURL(previewUrl);
       setError(err instanceof Error ? err.message : "Could not create the sticker.");
       setProgress(0);
       setPhase("camera");
@@ -241,10 +230,12 @@ function StickerLab() {
     setPhase("camera");
     setProgress(0);
     setError("");
-    if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-    if (stickerUrl) URL.revokeObjectURL(stickerUrl);
+    revokeUrl(sourceUrl);
+    revokeUrl(stickerUrl);
+    revokeUrl(maskUrl);
     setSourceUrl(null);
     setStickerUrl(null);
+    setMaskUrl(null);
     setAnalysis(fallbackAnalysis);
   }
 
@@ -272,6 +263,7 @@ function StickerLab() {
     progress,
     sourceUrl,
     stickerUrl,
+    maskUrl,
     onBack: resetFlow,
     onFile: processImage,
   };
@@ -356,15 +348,17 @@ function CaptureFlow({
           <X size={19} />
         </button>
 
-        <FocusCorners hidden={phase === "cutting"} />
+        <FocusCorners hidden={false} />
 
         {phase === "cutting" && sourceUrl && (
           <div className="cutting-layer" aria-live="polite">
-            <PhotoDissolve key={sourceUrl} src={sourceUrl} />
+            <div className="scan-beam" style={{ "--scan-progress": `${Math.min(88, Math.max(14, progress))}%` }} />
+            <div className="edge-glow" />
             <div className="cutting-wash" />
             <div className="scan-pill">
               <ScanLine size={15} />
-              <span>lifting subject {progress}%</span>
+              <span>{getCuttingCopy(progress)} {progress}%</span>
+              <i style={{ "--progress": `${progress}%` }} />
             </div>
           </div>
         )}
@@ -418,11 +412,13 @@ function CaptureFlow({
   );
 }
 
-function ConfirmFlow({ burstKey, isRevealing, onBack, onConfirm, onRetake, sourceUrl, stickerUrl }) {
+function ConfirmFlow({ burstKey, isRevealing, maskUrl, onBack, onConfirm, onRetake, sourceUrl, stickerUrl }) {
   return (
     <section className={`confirm-flow ${isRevealing ? "is-revealing" : ""}`}>
       {sourceUrl && <img src={sourceUrl} alt="" className="confirm-ghost-photo" />}
-      {sourceUrl && <PhotoDissolve key={`confirm-${sourceUrl}`} src={sourceUrl} compact />}
+      {sourceUrl && (
+        <PhotoDissolve key={`confirm-${sourceUrl}-${maskUrl || "full"}`} src={sourceUrl} maskSrc={maskUrl} compact />
+      )}
       <TopDateBar onBack={onBack} variant="dark" />
 
       <div className="confirm-stage">
@@ -586,13 +582,19 @@ async function createCutout(file, onProgress) {
     }
   }
 
+  const { removeBackground } = await loadBackgroundRemoval();
   return removeBackground(file, {
     ...cutoutConfig,
     progress: (_key, current, total) => {
       if (!total) return;
-      onProgress(Math.min(88, Math.round((current / total) * 72) + 10));
+      onProgress(Math.min(92, Math.round((current / total) * 62) + 24));
     },
   });
+}
+
+async function loadBackgroundRemoval() {
+  backgroundRemovalModulePromise ||= import("@imgly/background-removal");
+  return backgroundRemovalModulePromise;
 }
 
 async function createRemoteCutout(endpoint, file, onProgress) {
@@ -794,97 +796,266 @@ async function cleanStickerBlob(blob) {
   return canvasToBlob(outputCanvas, "image/png", 1, blob);
 }
 
-function PhotoDissolve({ compact = false, src }) {
+function PhotoDissolve({ compact = false, maskSrc, src }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
     let raf = 0;
     let cancelled = false;
-    const image = new Image();
+    let resources = null;
 
-    image.onload = () => {
-      if (cancelled || !canvasRef.current) return;
-      const canvas = canvasRef.current;
-      const context = canvas.getContext("2d");
-      const ratio = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = Math.max(1, Math.round(rect.width * ratio));
-      canvas.height = Math.max(1, Math.round(rect.height * ratio));
-      context.setTransform(ratio, 0, 0, ratio, 0, 0);
-
-      const cover = getCoverRect(image.width, image.height, rect.width, rect.height);
-      const sampleCanvas = document.createElement("canvas");
-      sampleCanvas.width = Math.max(1, Math.round(rect.width / (compact ? 4 : 3)));
-      sampleCanvas.height = Math.max(1, Math.round(rect.height / (compact ? 4 : 3)));
-      const sampleContext = sampleCanvas.getContext("2d", { willReadFrequently: true });
-      sampleContext.drawImage(
-        image,
-        cover.sx,
-        cover.sy,
-        cover.sw,
-        cover.sh,
-        0,
-        0,
-        sampleCanvas.width,
-        sampleCanvas.height,
-      );
-      const pixels = sampleContext.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height).data;
-      const step = compact ? 5 : 4;
-      const particles = [];
-
-      for (let y = 0; y < sampleCanvas.height; y += step) {
-        for (let x = 0; x < sampleCanvas.width; x += step) {
-          const index = (y * sampleCanvas.width + x) * 4;
-          const keep = hash21(x, y);
-          if (keep < 0.24) continue;
-          particles.push({
-            x: (x / sampleCanvas.width) * rect.width,
-            y: (y / sampleCanvas.height) * rect.height,
-            r: pixels[index],
-            g: pixels[index + 1],
-            b: pixels[index + 2],
-            a: 0.58 + keep * 0.36,
-            h1: hash21(x, y),
-            h2: hash21(x + 127.1, y + 311.7),
-            h3: hash21(x + 269.5, y + 183.3),
-            h4: hash21(x + 419.2, y + 53.7),
-          });
-        }
+    runMetalDissolve(canvasRef.current, { compact, maskSrc, src }, (nextRaf) => {
+      raf = nextRaf;
+    }).then((nextResources) => {
+      resources = nextResources;
+      if (cancelled) {
+        cleanupWebGLResources(resources);
       }
-
-      const start = performance.now();
-      const duration = compact ? 900 : 1450;
-
-      function frame(now) {
-        if (cancelled) return;
-        const progress = clamp((now - start) / duration, 0, 1);
-        context.clearRect(0, 0, rect.width, rect.height);
-
-        for (const particle of particles) {
-          const local = metalSweepProgress(particle, rect, progress);
-          if (local <= 0) continue;
-          const { x, y, alpha, size } = driftParticle(particle, local, compact ? 92 : 150);
-          context.fillStyle = `rgba(${particle.r}, ${particle.g}, ${particle.b}, ${alpha})`;
-          context.beginPath();
-          context.arc(x, y, size, 0, Math.PI * 2);
-          context.fill();
-        }
-
-        if (progress < 1) raf = requestAnimationFrame(frame);
-      }
-
-      raf = requestAnimationFrame(frame);
-    };
-
-    image.src = src;
+    });
 
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
+      cleanupWebGLResources(resources);
     };
-  }, [compact, src]);
+  }, [compact, maskSrc, src]);
 
   return <canvas ref={canvasRef} className="photo-dissolve" aria-hidden="true" />;
+}
+
+const dissolveVertexShaderSource = `
+  attribute vec2 a_position;
+  varying vec2 v_uv;
+
+  void main() {
+    v_uv = vec2((a_position.x + 1.0) * 0.5, 1.0 - (a_position.y + 1.0) * 0.5);
+    gl_Position = vec4(a_position, 0.0, 1.0);
+  }
+`;
+
+const dissolveFragmentShaderSource = `
+  precision highp float;
+
+  uniform sampler2D u_image;
+  uniform sampler2D u_mask;
+  uniform vec2 u_canvasSize;
+  uniform vec2 u_imageSize;
+  uniform float u_progress;
+  uniform float u_useMask;
+  varying vec2 v_uv;
+
+  float hash21(vec2 p) {
+    vec3 p3 = fract(vec3(p.x, p.y, p.x) * vec3(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  float smoothCut(float edge0, float edge1, float value) {
+    float t = clamp((value - edge0) / (edge1 - edge0), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+  }
+
+  vec2 coverUv(vec2 uv, vec2 sourceSize, vec2 targetSize) {
+    float sourceRatio = sourceSize.x / sourceSize.y;
+    float targetRatio = targetSize.x / targetSize.y;
+
+    if (sourceRatio > targetRatio) {
+      float visibleWidth = targetRatio / sourceRatio;
+      return vec2((1.0 - visibleWidth) * 0.5 + uv.x * visibleWidth, uv.y);
+    }
+
+    float visibleHeight = sourceRatio / targetRatio;
+    return vec2(uv.x, (1.0 - visibleHeight) * 0.5 + uv.y * visibleHeight);
+  }
+
+  void main() {
+    float progress = clamp(u_progress, 0.0, 1.0);
+    vec2 position = v_uv * u_canvasSize;
+    vec2 blockID = floor(position);
+    float r1 = hash21(blockID);
+    float r2 = hash21(blockID + vec2(127.1, 311.7));
+    float r3 = hash21(blockID + vec2(269.5, 183.3));
+    float r4 = hash21(blockID + vec2(419.2, 53.7));
+
+    float sweepPos = (v_uv.x + (1.0 - v_uv.y)) * 0.5;
+    float startThreshold = sweepPos * 0.55 + r1 * 0.30;
+    float localProgress = clamp((progress - startThreshold) / (1.0 - startThreshold + 0.01), 0.0, 1.0);
+    float eased = localProgress * localProgress * localProgress;
+
+    float baseAngle = -0.785398;
+    float angleVariation = (r2 - 0.5) * 1.92;
+    float angle = baseAngle + angleVariation;
+    vec2 dir = vec2(cos(angle), sin(angle));
+    float speed = 0.3 + r3 * 1.4;
+    float mag = eased * 200.0 * speed;
+    float wobble = sin(localProgress * 6.28 + r4 * 6.28) * (8.0 + r4 * 12.0) * eased;
+    vec2 perpDir = vec2(-dir.y, dir.x);
+    vec2 samplePos = position - (dir * mag + perpDir * wobble);
+
+    if (samplePos.x < 0.0 || samplePos.x > u_canvasSize.x || samplePos.y < 0.0 || samplePos.y > u_canvasSize.y) {
+      gl_FragColor = vec4(0.0);
+      return;
+    }
+
+    vec2 imageUv = coverUv(samplePos / u_canvasSize, u_imageSize, u_canvasSize);
+    vec2 textureUv = vec2(imageUv.x, 1.0 - imageUv.y);
+    vec4 color = texture2D(u_image, textureUv);
+    float maskAlpha = u_useMask > 0.5 ? texture2D(u_mask, textureUv).a : 0.0;
+    float subjectWeight = smoothCut(0.18, 0.72, maskAlpha);
+    float alphaFade = 1.0 - smoothCut(0.05, 0.7, localProgress);
+    float subjectFade = 1.0 - smoothCut(0.0, 0.12, progress);
+
+    color.a *= max((1.0 - subjectWeight) * alphaFade, subjectWeight * subjectFade);
+    gl_FragColor = color;
+  }
+`;
+
+async function runMetalDissolve(canvas, { compact, maskSrc, src }, setRaf) {
+  if (!canvas) return null;
+
+  try {
+    const [image, mask] = await Promise.all([
+      loadImage(src),
+      maskSrc ? loadImage(maskSrc).catch(() => null) : Promise.resolve(null),
+    ]);
+    const gl = canvas.getContext("webgl", {
+      alpha: true,
+      antialias: false,
+      depth: false,
+      premultipliedAlpha: false,
+      stencil: false,
+    });
+    if (!gl) return null;
+
+    const program = createWebGLProgram(gl, dissolveVertexShaderSource, dissolveFragmentShaderSource);
+    if (!program) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const ratio = Math.min(window.devicePixelRatio || 1, 3);
+    canvas.width = Math.max(1, Math.round(rect.width * ratio));
+    canvas.height = Math.max(1, Math.round(rect.height * ratio));
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+    const imageTexture = createImageTexture(gl, image);
+    const maskTexture = mask ? createImageTexture(gl, mask) : createTransparentTexture(gl);
+    const useMask = mask && Math.abs(image.width / image.height - mask.width / mask.height) < 0.02 ? 1 : 0;
+    const locations = {
+      position: gl.getAttribLocation(program, "a_position"),
+      image: gl.getUniformLocation(program, "u_image"),
+      mask: gl.getUniformLocation(program, "u_mask"),
+      canvasSize: gl.getUniformLocation(program, "u_canvasSize"),
+      imageSize: gl.getUniformLocation(program, "u_imageSize"),
+      progress: gl.getUniformLocation(program, "u_progress"),
+      useMask: gl.getUniformLocation(program, "u_useMask"),
+    };
+
+    gl.useProgram(program);
+    gl.enableVertexAttribArray(locations.position);
+    gl.vertexAttribPointer(locations.position, 2, gl.FLOAT, false, 0, 0);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, imageTexture);
+    gl.uniform1i(locations.image, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, maskTexture);
+    gl.uniform1i(locations.mask, 1);
+    gl.uniform2f(locations.canvasSize, canvas.width, canvas.height);
+    gl.uniform2f(locations.imageSize, image.width, image.height);
+    gl.uniform1f(locations.useMask, useMask);
+
+    const start = performance.now();
+    const duration = compact ? 1080 : 1450;
+    const resources = { buffer, gl, program, textures: [imageTexture, maskTexture] };
+
+    function frame(now) {
+      const progress = clamp((now - start) / duration, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.uniform1f(locations.progress, progress);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      if (progress < 1) {
+        const nextRaf = requestAnimationFrame(frame);
+        setRaf(nextRaf);
+      }
+    }
+
+    const nextRaf = requestAnimationFrame(frame);
+    setRaf(nextRaf);
+    return resources;
+  } catch (err) {
+    console.info("Metal-style dissolve unavailable.", err);
+    return null;
+  }
+}
+
+function createWebGLProgram(gl, vertexSource, fragmentSource) {
+  const vertexShader = createWebGLShader(gl, gl.VERTEX_SHADER, vertexSource);
+  const fragmentShader = createWebGLShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+  if (!vertexShader || !fragmentShader) return null;
+
+  const program = gl.createProgram();
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.linkProgram(program);
+  gl.deleteShader(vertexShader);
+  gl.deleteShader(fragmentShader);
+
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.info(gl.getProgramInfoLog(program));
+    gl.deleteProgram(program);
+    return null;
+  }
+
+  return program;
+}
+
+function createWebGLShader(gl, type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    console.info(gl.getShaderInfoLog(shader));
+    gl.deleteShader(shader);
+    return null;
+  }
+
+  return shader;
+}
+
+function createImageTexture(gl, image) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  return texture;
+}
+
+function createTransparentTexture(gl) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  return texture;
+}
+
+function cleanupWebGLResources(resources) {
+  if (!resources?.gl) return;
+  for (const texture of resources.textures || []) {
+    if (texture) resources.gl.deleteTexture(texture);
+  }
+  if (resources.buffer) resources.gl.deleteBuffer(resources.buffer);
+  if (resources.program) resources.gl.deleteProgram(resources.program);
 }
 
 function DissolveBurst({ src }) {
@@ -1117,8 +1288,19 @@ function shouldUsePrebuiltSampleCutout() {
   return !new URLSearchParams(window.location.search).has("remoteSample");
 }
 
+function getCuttingCopy(value) {
+  if (value < 22) return "freezing frame";
+  if (value < 52) return "finding edges";
+  if (value < 82) return "lifting subject";
+  return "polishing sticker";
+}
+
 function stopStream(stream) {
   stream?.getTracks().forEach((track) => track.stop());
+}
+
+function revokeUrl(url) {
+  if (url) URL.revokeObjectURL(url);
 }
 
 function clamp(value, min, max) {
