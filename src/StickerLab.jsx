@@ -213,9 +213,15 @@ function StickerLab() {
     }, "image/png");
   }
 
-  async function runSampleFlow() {
-    const [file, cutoutBlob] = await Promise.all([makeSampleBottleFile(), fetchBlob(sampleBottleCutout)]);
-    processImage(file, { cutoutBlob, minimumCuttingMs: 1150 });
+async function runSampleFlow() {
+    const file = await makeSampleBottleFile();
+    if (shouldUsePrebuiltSampleCutout()) {
+      const cutoutBlob = await fetchBlob(sampleBottleCutout);
+      processImage(file, { cutoutBlob, minimumCuttingMs: 1150 });
+      return;
+    }
+
+    processImage(file, { minimumCuttingMs: 650 });
   }
 
   function resetFlow() {
@@ -556,19 +562,15 @@ function StickerObject({ alt, src }) {
 }
 
 async function createCutout(file, onProgress) {
-  const endpoint = import.meta.env.VITE_VILO_CUTOUT_ENDPOINT;
+  const configuredEndpoint = import.meta.env.VITE_VILO_CUTOUT_ENDPOINT;
+  const endpoint = configuredEndpoint || (import.meta.env.DEV ? "/api/cutout" : "");
   if (endpoint) {
-    const formData = new FormData();
-    formData.append("image", file);
-    const response = await fetch(endpoint, { method: "POST", body: formData });
-    if (!response.ok) throw new Error("High quality cutout failed.");
-    const contentType = response.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      const payload = await response.json();
-      if (payload.imageBase64) return dataUrlToBlob(payload.imageBase64);
-      if (payload.imageUrl) return fetchBlob(payload.imageUrl);
+    try {
+      return await createRemoteCutout(endpoint, file, onProgress);
+    } catch (err) {
+      if (configuredEndpoint) throw err;
+      console.info("Cutout API unavailable; falling back to browser model.");
     }
-    return response.blob();
   }
 
   return removeBackground(file, {
@@ -578,6 +580,30 @@ async function createCutout(file, onProgress) {
       onProgress(Math.min(88, Math.round((current / total) * 72) + 10));
     },
   });
+}
+
+async function createRemoteCutout(endpoint, file, onProgress) {
+  onProgress(38);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 45000);
+
+  try {
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await fetch(endpoint, { method: "POST", body: formData, signal: controller.signal });
+    onProgress(76);
+    if (!response.ok) throw new Error("High quality cutout failed.");
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const payload = await response.json();
+      if (payload.imageBase64) return dataUrlToBlob(payload.imageBase64);
+      if (payload.imageUrl) return fetchBlob(payload.imageUrl);
+      throw new Error(payload.error || "High quality cutout failed.");
+    }
+    return response.blob();
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 async function analyzeFood(file) {
@@ -929,6 +955,10 @@ function canvasToBlob(canvas, type, quality, fallback) {
 
 function delay(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function shouldUsePrebuiltSampleCutout() {
+  return !new URLSearchParams(window.location.search).has("remoteSample");
 }
 
 function stopStream(stream) {
