@@ -19,6 +19,8 @@ import sampleBottleCutout from "./assets/samples/tea-bottle-cutout.png";
 import sampleBottlePhoto from "./assets/samples/tea-bottle-source.jpg";
 import "./sticker-lab.css";
 
+const CUTOUT_ENDPOINT_STORAGE_KEY = "vilo.cutoutEndpoint";
+const CUTOUT_MODEL_STORAGE_KEY = "vilo.cutoutModel";
 const todayLabel = "5月03";
 
 const fallbackAnalysis = {
@@ -76,7 +78,7 @@ function StickerLab() {
   }, [cameraStream]);
 
   useEffect(() => {
-    if (import.meta.env.VITE_VILO_CUTOUT_ENDPOINT) return undefined;
+    if (getConfiguredCutoutEndpoint()) return undefined;
 
     let cancelled = false;
     const warmModel = () => {
@@ -562,7 +564,7 @@ function StickerObject({ alt, src }) {
 }
 
 async function createCutout(file, onProgress) {
-  const configuredEndpoint = import.meta.env.VITE_VILO_CUTOUT_ENDPOINT;
+  const configuredEndpoint = getConfiguredCutoutEndpoint();
   const endpoint = configuredEndpoint || (import.meta.env.DEV ? "/api/cutout" : "");
   if (endpoint) {
     try {
@@ -612,9 +614,45 @@ async function createRemoteCutout(endpoint, file, onProgress) {
 
 function resolveCutoutEndpoint(endpoint) {
   const url = new URL(endpoint, window.location.href);
-  const model = import.meta.env.VITE_VILO_REMOTE_CUTOUT_MODEL;
+  const model = getConfiguredCutoutModel();
   if (model) url.searchParams.set("model", model);
   return url.toString();
+}
+
+function getConfiguredCutoutEndpoint() {
+  const runtimeEndpoint = readRuntimeSetting("cutoutEndpoint", CUTOUT_ENDPOINT_STORAGE_KEY);
+  return normalizeHttpEndpoint(runtimeEndpoint || import.meta.env.VITE_VILO_CUTOUT_ENDPOINT || "");
+}
+
+function getConfiguredCutoutModel() {
+  return readRuntimeSetting("cutoutModel", CUTOUT_MODEL_STORAGE_KEY) || import.meta.env.VITE_VILO_REMOTE_CUTOUT_MODEL || "";
+}
+
+function readRuntimeSetting(queryName, storageKey) {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has(queryName)) {
+    const value = (params.get(queryName) || "").trim();
+    if (value) {
+      window.localStorage?.setItem(storageKey, value);
+    } else {
+      window.localStorage?.removeItem(storageKey);
+    }
+    return value;
+  }
+
+  return window.localStorage?.getItem(storageKey) || "";
+}
+
+function normalizeHttpEndpoint(value) {
+  if (!value) return "";
+
+  try {
+    const url = new URL(value, window.location.href);
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 }
 
 async function analyzeFood(file) {

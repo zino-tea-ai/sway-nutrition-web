@@ -20,6 +20,14 @@ The Pages build uses these repository variables:
 
 If `VILO_CUTOUT_ENDPOINT` is empty, the frontend falls back to browser-side background removal.
 
+For smoke tests before the final backend URL is baked into the Pages build, pass a runtime endpoint:
+
+```text
+https://zino-tea-ai.github.io/sway-nutrition-web/?cutoutEndpoint=https%3A%2F%2Fexample.fly.dev%2Fapi%2Fcutout&cutoutModel=isnet-general-use
+```
+
+The runtime endpoint is stored in local storage. Clear it with `?cutoutEndpoint=`.
+
 ## First deploy
 
 Create and push the GitHub repo:
