@@ -257,6 +257,9 @@ who = api.whoami(token=token)
 namespace = who.get("name")
 repo_id = os.environ.get("VILO_HF_REPO_ID") or f"{namespace}/{os.environ.get('VILO_HF_SPACE_NAME', 'vilo-cutout-api')}"
 analyze_provider = os.environ.get("VILO_HF_ANALYZE_PROVIDER", "mock")
+openrouter_key = os.environ.get("VILO_HF_OPENROUTER_KEY") or ""
+if analyze_provider == "openrouter" and not openrouter_key:
+    raise SystemExit("AnalyzeProvider=openrouter requires OPENROUTER_API_KEY or VILO_OPENROUTER_API_KEY.")
 
 variables = [
     {"key": "VILO_CUTOUT_MODEL", "value": os.environ.get("VILO_CUTOUT_MODEL", "isnet-general-use")},
@@ -269,7 +272,6 @@ variables = [
     {"key": "VILO_OPENROUTER_APP_TITLE", "value": "Vilo Sticker Lab"},
 ]
 secrets = []
-openrouter_key = os.environ.get("VILO_HF_OPENROUTER_KEY") or ""
 if analyze_provider == "openrouter" and openrouter_key:
     secrets.append({"key": "OPENROUTER_API_KEY", "value": openrouter_key})
 
@@ -281,6 +283,10 @@ api.create_repo(
     space_variables=variables,
     space_secrets=secrets or None,
 )
+for variable in variables:
+    api.add_space_variable(repo_id=repo_id, key=variable["key"], value=variable["value"])
+for secret in secrets:
+    api.add_space_secret(repo_id=repo_id, key=secret["key"], value=secret["value"])
 commit = api.upload_folder(
     repo_id=repo_id,
     repo_type="space",
@@ -307,12 +313,19 @@ print(json.dumps(result, indent=2))
   if (!$SkipSmoke) {
     Invoke-Step "Wait for Hugging Face Space health" {
       $deadline = (Get-Date).AddMinutes(25)
+      $expectedAnalyzeProvider = $AnalyzeProvider.Trim().ToLowerInvariant()
       while ((Get-Date) -lt $deadline) {
         try {
           $response = Invoke-WebRequest -Uri "$spaceOrigin/health" -UseBasicParsing -TimeoutSec 20
           if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
-            Write-Host $response.Content
-            return
+            $health = $response.Content | ConvertFrom-Json
+            $providerMatches = ([string]$health.analyzeProvider).ToLowerInvariant() -eq $expectedAnalyzeProvider
+            $keyMatches = $expectedAnalyzeProvider -ne "openrouter" -or [bool]$health.openRouterKeyConfigured
+            if ($providerMatches -and $keyMatches) {
+              Write-Host $response.Content
+              return
+            }
+            Write-Host "Waiting for Space config: $($response.Content)"
           }
         } catch {
           Write-Host "Waiting for Space build/start..."
