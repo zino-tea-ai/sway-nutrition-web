@@ -46,6 +46,15 @@
   padding: 14px 14px 8px;
 }
 
+.board-header.is-titlebar {
+  grid-template-columns: 1fr;
+  padding: calc(14px + env(safe-area-inset-top)) 14px 8px;
+}
+
+.board-header.is-titlebar > div {
+  justify-items: start;
+}
+
 .board-header a {
   width: 42px;
   height: 42px;

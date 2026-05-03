@@ -138,17 +138,11 @@ function StickerBoard() {
   return (
     <main className="sticker-board-page">
       <section className="board-phone" aria-label="今天的贴纸板">
-        <header className="board-header">
-          <a href="/sticker-lab" aria-label="返回拍摄">
-            <ChevronLeft size={21} />
-          </a>
+        <header className="board-header is-titlebar">
           <div>
             <span>5月03</span>
             <strong>今天的贴纸</strong>
           </div>
-          <a href="/sticker-lab" aria-label="拍一个">
-            <Camera size={20} />
-          </a>
         </header>
 
         <section className="board-goals" aria-label="目标">

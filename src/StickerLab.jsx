@@ -20,6 +20,7 @@ import {
   createBoardStickerFromAnalysis,
   imageUrlToDataUrl,
 } from "./stickerBoardData.js";
+import { navigate } from "./Shell.jsx";
 import "./sticker-lab.css";
 
 const CUTOUT_ENDPOINT_STORAGE_KEY = "vilo.cutoutEndpoint";
@@ -278,8 +279,18 @@ function StickerLab() {
       },
       ...items,
     ]);
-    setPhase("history");
     persistStickerToBoard({ id, stickerUrl, analysis, capturedAt });
+    navigate("/today");
+  }
+
+  function exitToToday() {
+    analysisJobRef.current += 1;
+    stopCamera();
+    window.clearTimeout(revealTimerRef.current);
+    revokeUrl(sourceUrl);
+    revokeUrl(stickerUrl);
+    revokeUrl(maskUrl);
+    navigate("/today");
   }
 
   const commonProps = {
@@ -292,7 +303,7 @@ function StickerLab() {
     sourceUrl,
     stickerUrl,
     maskUrl,
-    onBack: resetFlow,
+    onBack: exitToToday,
     onFile: processImage,
   };
 
