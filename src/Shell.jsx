@@ -1,10 +1,12 @@
 import { Camera, Layers, User } from "lucide-react";
-import React, { useEffect, useSyncExternalStore } from "react";
-import App from "./App.jsx";
+import React, { Suspense, lazy, useEffect, useSyncExternalStore } from "react";
 import StickerBoard from "./StickerBoard.jsx";
 import StickerLab from "./StickerLab.jsx";
-import { STICKER_BOARD_STORAGE_KEY } from "./stickerBoardData.js";
 import "./shell.css";
+
+// Legacy Sway app is loaded only when /legacy is hit, so its styles.css
+// (still 2500+ lines of global rules) doesn't pollute the main bundle.
+const LegacyApp = lazy(() => import("./App.jsx"));
 
 const rawBase = import.meta.env.BASE_URL || "/";
 const basePath = rawBase.replace(/\/$/, "");
@@ -39,17 +41,6 @@ function usePath() {
   return useSyncExternalStore(subscribePopstate, getCurrentPath, getCurrentPath);
 }
 
-function hasAnyStickers() {
-  try {
-    const raw = window.localStorage.getItem(STICKER_BOARD_STORAGE_KEY);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0;
-  } catch {
-    return false;
-  }
-}
-
 const TABS = [
   { id: "today", label: "今天", path: "/today", icon: Layers },
   { id: "capture", label: "拍", path: "/capture", icon: Camera, isAction: true },
@@ -65,7 +56,7 @@ function Shell() {
       return;
     }
     if (path === "/" || path === "") {
-      navigate(hasAnyStickers() ? "/today" : "/capture", { replace: true });
+      navigate("/today", { replace: true });
       return;
     }
     if (path === "/sticker-lab" || path.startsWith("/sticker-lab/")) {
@@ -79,7 +70,11 @@ function Shell() {
   }, [path]);
 
   if (path === "/legacy") {
-    return <App />;
+    return (
+      <Suspense fallback={null}>
+        <LegacyApp />
+      </Suspense>
+    );
   }
 
   return <AppShell path={path} />;

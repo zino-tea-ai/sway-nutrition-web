@@ -1,57 +1,60 @@
 # Deployment
 
-This repo now has a split production path:
+The canonical production path:
 
-- Frontend: static Vite app on GitHub Pages.
-- Sticker API: FastAPI + rembg + OpenRouter vision recognition in a Docker container.
-- Vercel dev deploy: static Vite app + `/api/analyze-food` OpenRouter proxy. This is good for a stable shareable prototype while the heavy cutout API still waits for a container host.
-- Container registry: GitHub Container Registry.
+- **Frontend**: Vite SPA on **Vercel**, auto-deployed from `main` via the Vercel GitHub integration.
+- **Cutout + analyze backend**: FastAPI + rembg + OpenRouter, currently running on **Hugging Face Space** `zinottt/vilo-cutout-api`. Cloud Run and Fly are kept below as alternatives.
+- **Container registry**: GitHub Container Registry (`ghcr.io/zino-tea-ai/vilo-cutout-api`).
 
-## What is already automated
+The earlier GitHub Pages deploy has been retired (Pages had no backend env vars wired up and the page felt broken). Do not re-add it.
+
+## What is automated
 
 On every push to `main`:
 
-- `.github/workflows/pages.yml` builds `dist/` and deploys it to GitHub Pages.
+- **Vercel** rebuilds and deploys the frontend automatically (configured in the Vercel project's GitHub integration).
 - `.github/workflows/cutout-api-image.yml` builds `services/cutout_api/Dockerfile` and publishes `ghcr.io/zino-tea-ai/vilo-cutout-api`.
 
-The Pages build uses these repository variables:
+Vercel uses these environment variables (set in the Vercel project's Settings → Environment Variables):
 
-- `VILO_CUTOUT_ENDPOINT`: public backend URL, for example `https://vilo-cutout-api.fly.dev/api/cutout`.
-- `VILO_REMOTE_CUTOUT_MODEL`: optional model name, default `isnet-general-use`.
-- `VILO_ANALYZE_ENDPOINT`: public food recognition URL, for example `https://vilo-cutout-api.fly.dev/api/analyze-food`.
+| Name | Scope | Purpose |
+|---|---|---|
+| `VITE_VILO_CUTOUT_ENDPOINT` | Frontend (build-time) | Public cutout URL, e.g. `https://zinottt-vilo-cutout-api.hf.space/api/cutout` |
+| `VITE_VILO_ANALYZE_ENDPOINT` | Frontend (build-time) | Public analyze URL |
+| `VITE_VILO_REMOTE_CUTOUT_MODEL` | Frontend (build-time) | Optional, defaults to `isnet-general-use` |
+| `OPENROUTER_API_KEY` | Server-side only | Used by `api/analyze-food.js` (Vercel serverless fallback) |
 
-If `VILO_CUTOUT_ENDPOINT` is empty, the frontend falls back to browser-side background removal.
-If `VILO_ANALYZE_ENDPOINT` is empty, the frontend derives it from `VILO_CUTOUT_ENDPOINT` when the path ends in `/api/cutout`.
-On Vercel, if both are empty, the frontend uses same-origin `/api/analyze-food` for recognition and browser-side cutout for lifting.
+`OPENROUTER_API_KEY` must NOT have a `VITE_` prefix or it gets bundled into the client.
 
-For smoke tests before the final backend URL is baked into the Pages build, pass a runtime endpoint:
+If `VITE_VILO_CUTOUT_ENDPOINT` is empty, the frontend falls back to in-browser background removal (slow, but works).
+If `VITE_VILO_ANALYZE_ENDPOINT` is empty, the frontend derives it from `VITE_VILO_CUTOUT_ENDPOINT` when that one ends in `/api/cutout`.
+
+For ad-hoc smoke tests against an alternate backend without redeploying, append a runtime endpoint to any URL:
 
 ```text
-https://zino-tea-ai.github.io/sway-nutrition-web/?cutoutEndpoint=https%3A%2F%2Fexample.fly.dev%2Fapi%2Fcutout&cutoutModel=isnet-general-use
+https://<your-vercel-app>.vercel.app/?cutoutEndpoint=https%3A%2F%2Fexample.fly.dev%2Fapi%2Fcutout&cutoutModel=isnet-general-use
 ```
 
-The runtime endpoint is stored in local storage. Clear it with `?cutoutEndpoint=`.
+The runtime endpoint is stored in `localStorage`. Clear it with `?cutoutEndpoint=`.
 
-## Vercel development deploy
+## First-time Vercel deploy
 
-Use this path when you want a stable public URL quickly and do not have a Fly/RunPod container account ready yet.
+Run once from the repo root:
 
 ```powershell
-npm run build
-npm run qa:vercel:analyze
 npx vercel
 ```
 
-When Vercel asks:
+When prompted:
 
 - Set up and deploy: `Y`
 - Which scope: choose your account/team
-- Link to existing project: usually `N` for the first deploy
-- Project name: `sway-nutrition-web` or `vilo-sticker-lab`
+- Link to existing project: `N` for the first deploy
+- Project name: `sway-nutrition-web` or `vilo`
 - Build command: `npm run build`
 - Output directory: `dist`
 
-Then set the server-side OpenRouter key in Vercel:
+Then add the server-side OpenRouter key (no `VITE_` prefix):
 
 ```powershell
 npx vercel env add OPENROUTER_API_KEY production
@@ -59,36 +62,20 @@ npx vercel env add OPENROUTER_API_KEY preview
 npx vercel --prod
 ```
 
-Do not set `OPENROUTER_API_KEY` as a `VITE_` variable. It must stay server-side only.
-
-The Vercel URL should support:
+The deployed URL exposes:
 
 ```text
-https://<your-vercel-app>.vercel.app/sticker-lab
-https://<your-vercel-app>.vercel.app/api/analyze-food
+https://<your-vercel-app>.vercel.app/                  → /today (board) or /capture if no stickers yet
+https://<your-vercel-app>.vercel.app/today             → today's sticker board
+https://<your-vercel-app>.vercel.app/capture           → capture flow (camera / upload / sample)
+https://<your-vercel-app>.vercel.app/capture/confirm   → captured sticker, before save
+https://<your-vercel-app>.vercel.app/capture/detail    → captured sticker + analysis
+https://<your-vercel-app>.vercel.app/api/analyze-food  → server-side OpenRouter proxy
 ```
 
-This Vercel path does not run the Python `rembg` container. For faster and more consistent high-quality cutout, deploy the Docker API below and set `VILO_CUTOUT_ENDPOINT`.
+`/sticker-lab` and `/sticker-board` redirect to `/capture` and `/today` for old links.
 
-## First deploy
-
-Create and push the GitHub repo:
-
-```powershell
-gh repo create zino-tea-ai/sway-nutrition-web --public --source . --remote origin --push
-```
-
-Enable Pages from GitHub Actions:
-
-```powershell
-gh api `
-  --method POST `
-  -H "Accept: application/vnd.github+json" `
-  /repos/zino-tea-ai/sway-nutrition-web/pages `
-  -f build_type=workflow
-```
-
-If the API returns that Pages is already configured, that is fine.
+To swap the cutout backend (HF Space → Cloud Run / Fly / something else), follow one of the sections below and update `VITE_VILO_CUTOUT_ENDPOINT` in Vercel.
 
 ## Backend deploy on Google Cloud Run
 

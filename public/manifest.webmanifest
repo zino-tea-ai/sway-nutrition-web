@@ -2,7 +2,7 @@
   "name": "Vilo",
   "short_name": "Vilo",
   "description": "Sticker-first food journal — capture, lift, see how today is going.",
-  "start_url": "/",
+  "start_url": "/today",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
