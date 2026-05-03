@@ -90,6 +90,99 @@ gh api `
 
 If the API returns that Pages is already configured, that is fine.
 
+## Backend deploy on Google Cloud Run
+
+Recommended production path. Cloud Run runs the Docker API, gives it a public HTTPS URL, scales to zero, and lets Vercel stay as the frontend host.
+
+Prerequisites:
+
+- Google Cloud SDK installed: `winget install Google.CloudSDK`
+- Logged in: `gcloud auth login`
+- Project selected: `gcloud config set project <PROJECT_ID>`
+- Billing enabled for the selected project
+- Vercel CLI logged in: `vercel whoami`
+- `OPENROUTER_API_KEY` available in the shell or in `.env`
+
+Deploy:
+
+```powershell
+npm run deploy:cutout:cloud-run -- -ProjectId <PROJECT_ID>
+```
+
+Useful variants:
+
+```powershell
+npm run deploy:cutout:cloud-run -- -ProjectId <PROJECT_ID> -Region us-central1
+npm run deploy:cutout:cloud-run -- -ProjectId <PROJECT_ID> -ServiceName vilo-cutout-api-dev
+npm run deploy:cutout:cloud-run -- -ProjectId <PROJECT_ID> -SkipVercelDeploy
+```
+
+The script:
+
+- enables Cloud Run, Cloud Build, Artifact Registry, and Secret Manager APIs;
+- creates an Artifact Registry Docker repo if needed;
+- stores `OPENROUTER_API_KEY` in Secret Manager;
+- builds `services/cutout_api/Dockerfile` with Cloud Build;
+- deploys the container to Cloud Run with `2Gi` memory, `2` CPU, `min-instances=0`, and public HTTPS;
+- smoke-tests `/health`, `/api/cutout?response=json`, and `/api/analyze-food`;
+- writes these Vercel env vars and redeploys production:
+
+```text
+VITE_VILO_CUTOUT_ENDPOINT=https://<cloud-run-service>/api/cutout
+VITE_VILO_ANALYZE_ENDPOINT=https://<cloud-run-service>/api/analyze-food
+VITE_VILO_REMOTE_CUTOUT_MODEL=isnet-general-use
+```
+
+You can smoke-test the backend later without redeploying:
+
+```powershell
+npm run qa:cutout:public -- --cutout-endpoint https://<cloud-run-service>/api/cutout
+```
+
+## Backend deploy on Hugging Face Spaces
+
+Use this path when Google Cloud billing is not available yet. It uses a free Docker Space on CPU Basic. This is good for phone testing and early prototype review, but not final production because free Spaces can sleep after inactivity.
+
+Prerequisites:
+
+- Hugging Face account
+- A write token from <https://huggingface.co/settings/tokens>
+- Set the token in PowerShell:
+
+```powershell
+$env:HF_TOKEN="<HUGGING_FACE_TOKEN>"
+```
+
+Deploy:
+
+```powershell
+npm run deploy:cutout:hf
+```
+
+Useful variants:
+
+```powershell
+npm run deploy:cutout:hf -- -RepoId <hf-username>/vilo-cutout-api
+npm run deploy:cutout:hf -- -SkipVercelDeploy
+npm run deploy:cutout:hf -- -AnalyzeProvider openrouter -EnvPath C:\path\to\.env
+```
+
+By default this script deploys the cutout API with `VILO_ANALYZE_PROVIDER=mock`, because it is meant to unblock free phone testing. When OpenRouter is available, pass `-AnalyzeProvider openrouter` with `OPENROUTER_API_KEY` in the shell or env file.
+
+The script:
+
+- creates or updates a Docker Space;
+- uploads the FastAPI cutout service;
+- waits for `/health`;
+- smoke-tests `/api/cutout?response=json`;
+- writes Vercel env vars and redeploys production unless skipped.
+
+The public API URL will look like:
+
+```text
+https://<hf-username>-vilo-cutout-api.hf.space/api/cutout
+```
+
 ## Backend deploy on Fly
 
 The fastest path from this Windows repo is the local deploy script. It deploys the Docker API to Fly, smoke-tests `/health`, `/api/cutout?response=json`, `/api/analyze-food`, writes the public API URLs into Vercel env, then deploys Vercel production again.

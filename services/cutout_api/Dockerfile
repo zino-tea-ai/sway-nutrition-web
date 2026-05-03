@@ -11,7 +11,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     VILO_WARMUP=1 \
     VILO_ANALYZE_PROVIDER=openrouter \
     VILO_OPENROUTER_MODEL=google/gemini-2.5-flash \
-    VILO_OPENROUTER_APP_TITLE="Vilo Sticker Lab"
+    VILO_OPENROUTER_APP_TITLE="Vilo Sticker Lab" \
+    PORT=8080
 
 WORKDIR /app
 
@@ -27,6 +28,6 @@ COPY services /app/services
 # Pull the model during image build so runtime cold starts do not download it on the first user request.
 RUN python -c "from rembg import new_session; import os; new_session(os.environ['VILO_CUTOUT_MODEL'])"
 
-EXPOSE 8787
+EXPOSE 8080
 
-CMD ["uvicorn", "services.cutout_api.app:app", "--host", "0.0.0.0", "--port", "8787", "--workers", "1"]
+CMD ["sh", "-c", "uvicorn services.cutout_api.app:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1"]

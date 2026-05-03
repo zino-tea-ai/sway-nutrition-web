@@ -1,0 +1,21 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - services/cutout_api/Dockerfile
+      - --build-arg
+      - VILO_CUTOUT_MODEL=${_MODEL}
+      - -t
+      - ${_IMAGE}
+      - .
+
+images:
+  - ${_IMAGE}
+
+substitutions:
+  _MODEL: isnet-general-use
+  _IMAGE: us-central1-docker.pkg.dev/$PROJECT_ID/vilo/vilo-cutout-api:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -8,6 +8,7 @@ const cutoutEndpoint = normalizeEndpoint(
 const model = args.model || process.env.VILO_REMOTE_CUTOUT_MODEL || process.env.VILO_CUTOUT_MODEL || "isnet-general-use";
 const origin = args.origin || process.env.CUTOUT_TEST_ORIGIN || "https://sway-nutrition-web.vercel.app";
 const samplePath = path.resolve(args.sample || "src/assets/samples/tea-bottle-source.jpg");
+const skipAnalyze = Boolean(args["skip-analyze"]);
 
 if (!cutoutEndpoint) {
   fail("Missing --cutout-endpoint or VILO_CUTOUT_ENDPOINT.");
@@ -22,7 +23,7 @@ const analyzeEndpoint = `${apiBase}/api/analyze-food`;
 
 await assertCors(cutoutEndpoint, origin);
 const health = await getJson(`${apiBase}/health`, "health");
-if (!health.ok || !health.openRouterKeyConfigured) {
+if (!health.ok || (!skipAnalyze && !health.openRouterKeyConfigured)) {
   fail(`Health failed or OpenRouter key is missing: ${JSON.stringify(health)}`);
 }
 
@@ -34,7 +35,9 @@ if (!contract?.endpoints?.cutout || !contract?.endpoints?.analyzeFood) {
 await postJson(`${apiBase}/api/warmup?model=${encodeURIComponent(model)}`, undefined, "warmup");
 const image = await readFile(samplePath);
 await assertCutoutJson(cutoutEndpoint, image, model);
-await assertAnalyze(analyzeEndpoint, image);
+if (!skipAnalyze) {
+  await assertAnalyze(analyzeEndpoint, image);
+}
 
 console.log(JSON.stringify({
   ok: true,
@@ -42,6 +45,7 @@ console.log(JSON.stringify({
   analyzeEndpoint,
   model,
   origin,
+  skipAnalyze,
 }, null, 2));
 
 async function assertCors(endpoint, requestOrigin) {

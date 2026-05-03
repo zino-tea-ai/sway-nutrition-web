@@ -14,6 +14,8 @@
     "qa:vercel:analyze": "node scripts/vercel-analyze-api-smoke.mjs",
     "bench:cutout": "node scripts/cutout-model-benchmark.mjs",
     "cutout:api": ".venv-cutout\\Scripts\\python.exe -m uvicorn services.cutout_api.app:app --host 127.0.0.1 --port 8787",
+    "deploy:cutout:cloud-run": "powershell -ExecutionPolicy Bypass -File scripts/deploy-cutout-cloud-run.ps1",
+    "deploy:cutout:hf": "powershell -ExecutionPolicy Bypass -File scripts/deploy-cutout-hf-space.ps1",
     "deploy:cutout:fly": "powershell -ExecutionPolicy Bypass -File scripts/deploy-cutout-fly.ps1"
   },
   "dependencies": {

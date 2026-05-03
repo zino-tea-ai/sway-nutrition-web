@@ -20,6 +20,8 @@ import "./sticker-lab.css";
 const CUTOUT_ENDPOINT_STORAGE_KEY = "vilo.cutoutEndpoint";
 const CUTOUT_MODEL_STORAGE_KEY = "vilo.cutoutModel";
 const ANALYZE_ENDPOINT_STORAGE_KEY = "vilo.analyzeEndpoint";
+const LOCAL_CUTOUT_ENDPOINT = "http://127.0.0.1:8787/api/cutout";
+const LOCAL_ANALYZE_ENDPOINT = "http://127.0.0.1:8787/api/analyze-food";
 const CUTOUT_MAX_SOURCE_EDGE = 1600;
 const CUTOUT_UPLOAD_TYPE = "image/jpeg";
 const CUTOUT_UPLOAD_QUALITY = 0.88;
@@ -607,7 +609,7 @@ function StickerObject({ alt, src }) {
 
 async function createCutout(file, onProgress) {
   const configuredEndpoint = getConfiguredCutoutEndpoint();
-  const endpoint = configuredEndpoint || (import.meta.env.DEV ? "/api/cutout" : "");
+  const endpoint = configuredEndpoint || (import.meta.env.DEV ? LOCAL_CUTOUT_ENDPOINT : "");
   if (endpoint) {
     try {
       return await createRemoteCutout(endpoint, file, onProgress);
@@ -775,7 +777,8 @@ function getConfiguredAnalyzeEndpoint() {
   const inferredEndpoint = inferAnalyzeEndpoint(getConfiguredCutoutEndpoint());
   if (inferredEndpoint) return inferredEndpoint;
 
-  if (import.meta.env.DEV || shouldUseSameOriginApi()) return "/api/analyze-food";
+  if (import.meta.env.DEV) return LOCAL_ANALYZE_ENDPOINT;
+  if (shouldUseSameOriginApi()) return "/api/analyze-food";
   return "";
 }
 
