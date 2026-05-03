@@ -490,6 +490,47 @@
   transform: translate(-50%, -50%);
 }
 
+.lifted-subject-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lifted-subject-frame img {
+  display: block;
+  filter:
+    drop-shadow(0 1.6px 0 rgba(255, 255, 255, 0.96))
+    drop-shadow(1.6px 0 0 rgba(255, 255, 255, 0.96))
+    drop-shadow(-1.6px 0 0 rgba(255, 255, 255, 0.96))
+    drop-shadow(0 -1.6px 0 rgba(255, 255, 255, 0.96))
+    drop-shadow(0 20px 24px rgba(14, 15, 16, 0.2));
+}
+
+.lifted-subject-frame.is-aligned img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: translateY(-17dvh);
+  will-change: transform;
+}
+
+.lifted-subject-frame.is-cropped {
+  display: grid;
+  place-items: center;
+}
+
+.lifted-subject-frame.is-cropped img {
+  width: min(286px, 68vw);
+  height: min(286px, 68vw);
+  object-fit: contain;
+}
+
+.lifted-subject-frame.is-revealing img {
+  animation: liftedSubjectSettle 1.38s cubic-bezier(0.2, 1, 0.22, 1) both;
+}
+
 .confirm-stage .sticker-object {
   width: 100%;
   animation: subjectLift 780ms cubic-bezier(0.2, 1, 0.22, 1) both;
@@ -881,6 +922,23 @@
   50% {
     opacity: 0.28;
     transform: scale(1.025);
+  }
+}
+
+@keyframes liftedSubjectSettle {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  72% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(-17dvh) scale(1);
   }
 }
 

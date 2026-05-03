@@ -113,7 +113,6 @@ function StickerLab() {
     setAnalysis(fallbackAnalysis);
     setPhase("cutting");
 
-    const startedAt = performance.now();
     const progressTimer = window.setInterval(() => {
       setProgress((value) => {
         if (value < 18) return Math.min(18, value + 5);
@@ -142,7 +141,8 @@ function StickerLab() {
         analyzeFood(workingFile),
         delay(minimumCuttingMs),
       ]);
-      const nextMaskUrl = URL.createObjectURL(cutoutBlob);
+      const hasAlignedMask = await isAlignedCutoutMask(workingFile, cutoutBlob);
+      const nextMaskUrl = hasAlignedMask ? URL.createObjectURL(cutoutBlob) : null;
       const cleanedBlob = await cleanStickerBlob(cutoutBlob);
       const nextStickerUrl = URL.createObjectURL(cleanedBlob);
       setMaskUrl(nextMaskUrl);
@@ -415,14 +415,15 @@ function CaptureFlow({
 function ConfirmFlow({ burstKey, isRevealing, maskUrl, onBack, onConfirm, onRetake, sourceUrl, stickerUrl }) {
   return (
     <section className={`confirm-flow ${isRevealing ? "is-revealing" : ""}`}>
-      {sourceUrl && <img src={sourceUrl} alt="" className="confirm-ghost-photo" />}
-      {sourceUrl && (
+      {isRevealing && sourceUrl && (
         <PhotoDissolve key={`confirm-${sourceUrl}-${maskUrl || "full"}`} src={sourceUrl} maskSrc={maskUrl} compact />
       )}
       <TopDateBar onBack={onBack} variant="dark" />
 
+      {maskUrl && <LiftedSubjectFrame src={maskUrl} aligned isRevealing={isRevealing} />}
+
       <div className="confirm-stage">
-        {stickerUrl && (
+        {!maskUrl && !isRevealing && stickerUrl && (
           <>
             <StickerObject src={stickerUrl} alt="Lifted food sticker" />
             <DissolveBurst key={`${stickerUrl}-${burstKey}`} src={stickerUrl} />
@@ -449,6 +450,17 @@ function ConfirmFlow({ burstKey, isRevealing, maskUrl, onBack, onConfirm, onReta
         </button>
       </div>
     </section>
+  );
+}
+
+function LiftedSubjectFrame({ aligned, isRevealing, src }) {
+  return (
+    <div
+      className={`lifted-subject-frame ${aligned ? "is-aligned" : "is-cropped"} ${isRevealing ? "is-revealing" : ""}`}
+      aria-hidden="true"
+    >
+      <img src={src} alt="" />
+    </div>
   );
 }
 
@@ -796,6 +808,26 @@ async function cleanStickerBlob(blob) {
   return canvasToBlob(outputCanvas, "image/png", 1, blob);
 }
 
+async function isAlignedCutoutMask(sourceBlob, cutoutBlob) {
+  let sourceBitmap;
+  let cutoutBitmap;
+
+  try {
+    [sourceBitmap, cutoutBitmap] = await Promise.all([createBitmap(sourceBlob), createBitmap(cutoutBlob)]);
+    const sourceRatio = sourceBitmap.width / sourceBitmap.height;
+    const cutoutRatio = cutoutBitmap.width / cutoutBitmap.height;
+    const ratioDelta = Math.abs(sourceRatio - cutoutRatio);
+    const widthDelta = Math.abs(sourceBitmap.width - cutoutBitmap.width) / sourceBitmap.width;
+    const heightDelta = Math.abs(sourceBitmap.height - cutoutBitmap.height) / sourceBitmap.height;
+    return ratioDelta < 0.02 && widthDelta < 0.03 && heightDelta < 0.03;
+  } catch {
+    return false;
+  } finally {
+    sourceBitmap?.close?.();
+    cutoutBitmap?.close?.();
+  }
+}
+
 function PhotoDissolve({ compact = false, maskSrc, src }) {
   const canvasRef = useRef(null);
 
@@ -973,8 +1005,9 @@ async function runMetalDissolve(canvas, { compact, maskSrc, src }, setRaf) {
 
     function frame(now) {
       const progress = clamp((now - start) / duration, 0, 1);
+      const shaderProgress = 1 - (1 - progress) ** 1.8;
       gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.uniform1f(locations.progress, progress);
+      gl.uniform1f(locations.progress, shaderProgress);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       if (progress < 1) {
         const nextRaf = requestAnimationFrame(frame);
