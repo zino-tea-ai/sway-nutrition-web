@@ -38,9 +38,11 @@ npm run dev
 - `GET /api/models`
 - `POST /api/warmup?model=isnet-general-use`
 - `POST /api/cutout?model=isnet-general-use`
+- `POST /api/cutout?model=isnet-general-use&response=json`
 - `POST /api/analyze-food`
 
 `/api/cutout` accepts multipart form-data with an `image` file and returns `image/png`.
+With `response=json`, `/api/cutout` returns a full-size `mask` PNG for the dissolve reveal plus a cropped `sticker` PNG for the detail card. Both images are base64 encoded in the response so the frontend can start the reveal without doing another crop pass.
 `/api/analyze-food` accepts the same `image` file and returns the stable sticker detail JSON used by the frontend:
 
 ```json

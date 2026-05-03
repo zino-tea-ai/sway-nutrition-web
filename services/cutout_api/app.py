@@ -192,8 +192,30 @@ def contract() -> dict[str, Any]:
                 "path": "/api/cutout",
                 "contentType": "multipart/form-data",
                 "fileField": "image",
-                "query": {"model": DEFAULT_MODEL, "alpha_matting": False},
-                "response": "image/png",
+                "query": {"model": DEFAULT_MODEL, "alpha_matting": False, "response": "png | json"},
+                "response": {
+                    "default": "image/png",
+                    "json": {
+                        "ok": True,
+                        "contractVersion": CONTRACT_VERSION,
+                        "model": "string",
+                        "requestId": "string",
+                        "inputPixels": "number",
+                        "cutoutMs": "number",
+                        "mask": {
+                            "mime": "image/png",
+                            "width": "number",
+                            "height": "number",
+                            "imageBase64": "base64 png",
+                        },
+                        "sticker": {
+                            "mime": "image/png",
+                            "width": "number",
+                            "height": "number",
+                            "imageBase64": "base64 png",
+                        },
+                    },
+                },
                 "headers": [
                     "x-vilo-request-id",
                     "x-vilo-cutout-ms",
@@ -255,6 +277,7 @@ async def cutout(
     image: UploadFile = File(...),
     model: str | None = Query(default=None),
     alpha_matting: bool | None = Query(default=None),
+    response_format: str | None = Query(default=None, alias="response"),
 ) -> Response:
     request_id = request.state.request_id
     started = time.perf_counter()
@@ -284,6 +307,27 @@ async def cutout(
         len(output),
         elapsed_ms,
     )
+
+    if (response_format or "").strip().lower() == "json":
+        cutout_payload = await run_in_threadpool(
+            build_cutout_payload,
+            output,
+            request_id,
+            model_name,
+            input_pixels,
+            elapsed_ms,
+        )
+        return JSONResponse(
+            content=cutout_payload,
+            headers={
+                "cache-control": "no-store",
+                "x-vilo-cutout-model": model_name,
+                "x-vilo-cutout-ms": str(elapsed_ms),
+                "x-vilo-input-pixels": str(input_pixels),
+                "x-vilo-output-bytes": str(len(output)),
+                "x-vilo-request-id": request_id,
+            },
+        )
 
     return Response(
         content=output,
@@ -376,6 +420,70 @@ def normalize_image_bytes(raw: bytes) -> tuple[bytes, int]:
     buffer = BytesIO()
     image.save(buffer, format="PNG", optimize=True)
     return buffer.getvalue(), input_pixels
+
+
+def build_cutout_payload(
+    output: bytes,
+    request_id: str,
+    model_name: str,
+    input_pixels: int,
+    elapsed_ms: int,
+) -> dict[str, Any]:
+    mask_bytes, mask_size, sticker_bytes, sticker_size = create_mask_and_sticker_pngs(output)
+    return {
+        "ok": True,
+        "contractVersion": CONTRACT_VERSION,
+        "model": model_name,
+        "requestId": request_id,
+        "inputPixels": input_pixels,
+        "cutoutMs": elapsed_ms,
+        "mask": {
+            "mime": "image/png",
+            "width": mask_size[0],
+            "height": mask_size[1],
+            "imageBase64": base64.b64encode(mask_bytes).decode("ascii"),
+        },
+        "sticker": {
+            "mime": "image/png",
+            "width": sticker_size[0],
+            "height": sticker_size[1],
+            "imageBase64": base64.b64encode(sticker_bytes).decode("ascii"),
+        },
+    }
+
+
+def create_mask_and_sticker_pngs(output: bytes) -> tuple[bytes, tuple[int, int], bytes, tuple[int, int]]:
+    image = open_image(output).convert("RGBA")
+    alpha = image.getchannel("A")
+    alpha_curve = [
+        0 if value < 28 else round((min(max((value - 28) / 160, 0), 1) ** 0.48) * 255) if value < 188 else value
+        for value in range(256)
+    ]
+    cleaned_alpha = alpha.point(alpha_curve)
+    image.putalpha(cleaned_alpha)
+
+    mask_bytes = image_to_png_bytes(image)
+    bounds = cleaned_alpha.point(lambda value: 255 if value > 16 else 0).getbbox()
+    if not bounds:
+        return mask_bytes, image.size, mask_bytes, image.size
+
+    left, top, right, bottom = bounds
+    pad = round(max(image.size) * 0.05)
+    crop_box = (
+        max(0, left - pad),
+        max(0, top - pad),
+        min(image.width, right + pad),
+        min(image.height, bottom + pad),
+    )
+    sticker = image.crop(crop_box)
+    sticker_bytes = image_to_png_bytes(sticker)
+    return mask_bytes, image.size, sticker_bytes, sticker.size
+
+
+def image_to_png_bytes(image: Image.Image) -> bytes:
+    buffer = BytesIO()
+    image.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
 
 
 def create_analysis(upload: UploadFile, raw: bytes) -> dict[str, Any]:

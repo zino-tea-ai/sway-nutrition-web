@@ -48,6 +48,7 @@ try {
   await assertAnalyze(`${cutoutUrl}/api/analyze-food`);
   await waitForHttp(targetUrl, 45000);
   await warmup(`${cutoutUrl}/api/warmup?model=${encodeURIComponent(model)}`);
+  await assertCutoutJson(`${cutoutUrl}/api/cutout?model=${encodeURIComponent(model)}&response=json`);
 
   const qa = spawn(process.execPath, ["scripts/sticker-lab-qa.mjs"], {
     env: {
@@ -98,6 +99,28 @@ async function assertAnalyze(url) {
   const payload = await response.json();
   for (const field of ["name", "localName", "type", "calories", "protein", "fiber", "confidence", "note"]) {
     if (!(field in payload)) throw new Error(`Analyze response is missing ${field}.`);
+  }
+}
+
+async function assertCutoutJson(url) {
+  const buffer = await readFile(path.resolve("src", "assets", "samples", "tea-bottle-source.jpg"));
+  const formData = new FormData();
+  formData.append("image", new Blob([buffer], { type: "image/jpeg" }), "tea-bottle-source.jpg");
+  const response = await fetch(url, { method: "POST", body: formData });
+  if (!response.ok) {
+    const text = await response.text().catch(() => response.statusText);
+    throw new Error(`Cutout JSON failed: ${response.status} ${text}`);
+  }
+  const payload = await response.json();
+  for (const section of ["mask", "sticker"]) {
+    if (!payload?.[section]?.imageBase64) throw new Error(`Cutout JSON is missing ${section}.imageBase64.`);
+    if (payload[section].mime !== "image/png") throw new Error(`Cutout JSON ${section} mime is not image/png.`);
+    if (!(payload[section].width > 0) || !(payload[section].height > 0)) {
+      throw new Error(`Cutout JSON ${section} dimensions are invalid.`);
+    }
+  }
+  if (payload.mask.width < payload.sticker.width || payload.mask.height < payload.sticker.height) {
+    throw new Error("Cutout JSON sticker should fit inside the full-size mask.");
   }
 }
 

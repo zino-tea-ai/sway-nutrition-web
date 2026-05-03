@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   Crop,
   RotateCcw,
-  ScanLine,
   Sparkles,
   Upload,
   Volume2,
@@ -66,11 +65,13 @@ function StickerLab() {
   const videoRef = useRef(null);
   const captureCanvasRef = useRef(null);
   const revealTimerRef = useRef(0);
+  const analysisJobRef = useRef(0);
   const [phase, setPhase] = useState("camera");
   const [sourceUrl, setSourceUrl] = useState(null);
   const [stickerUrl, setStickerUrl] = useState(null);
   const [maskUrl, setMaskUrl] = useState(null);
   const [analysis, setAnalysis] = useState(fallbackAnalysis);
+  const [analysisPending, setAnalysisPending] = useState(false);
   const [cameraStream, setCameraStream] = useState(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
@@ -100,6 +101,8 @@ function StickerLab() {
   async function processImage(file, options = {}) {
     if (!file) return;
 
+    const jobId = analysisJobRef.current + 1;
+    analysisJobRef.current = jobId;
     const previewUrl = URL.createObjectURL(file);
     setError("");
     setProgress(2);
@@ -111,6 +114,7 @@ function StickerLab() {
     setStickerUrl(null);
     setMaskUrl(null);
     setAnalysis(fallbackAnalysis);
+    setAnalysisPending(false);
     setPhase("cutting");
 
     const progressTimer = window.setInterval(() => {
@@ -133,28 +137,39 @@ function StickerLab() {
         });
       }
       const cutoutTask = options.cutoutBlob
-        ? Promise.resolve(options.cutoutBlob)
+        ? Promise.resolve({ maskBlob: options.cutoutBlob })
         : createCutout(workingFile, (percent) => setProgress(percent));
+      setAnalysisPending(Boolean(getConfiguredAnalyzeEndpoint()));
+      analyzeFood(workingFile)
+        .then((nextAnalysis) => {
+          if (analysisJobRef.current === jobId) setAnalysis(nextAnalysis);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (analysisJobRef.current === jobId) setAnalysisPending(false);
+        });
       const minimumCuttingMs = options.minimumCuttingMs ?? 1500;
-      const [cutoutBlob, nextAnalysis] = await Promise.all([
+      const [cutoutResult] = await Promise.all([
         cutoutTask,
-        analyzeFood(workingFile),
         delay(minimumCuttingMs),
       ]);
-      const hasAlignedMask = await isAlignedCutoutMask(workingFile, cutoutBlob);
-      const nextMaskUrl = hasAlignedMask ? URL.createObjectURL(cutoutBlob) : null;
-      const cleanedBlob = await cleanStickerBlob(cutoutBlob);
+      const { maskBlob, stickerBlob } = normalizeCutoutResult(cutoutResult);
+      if (!maskBlob) throw new Error("Could not create the sticker.");
+      const hasAlignedMask = await isAlignedCutoutMask(workingFile, maskBlob);
+      const nextMaskUrl = hasAlignedMask ? URL.createObjectURL(maskBlob) : null;
+      const cleanedBlob = stickerBlob || await cleanStickerBlob(maskBlob);
       const nextStickerUrl = URL.createObjectURL(cleanedBlob);
       setMaskUrl(nextMaskUrl);
       setStickerUrl(nextStickerUrl);
-      setAnalysis(nextAnalysis);
       setBurstKey((value) => value + 1);
       setProgress(100);
       setPhase("revealing");
       revealTimerRef.current = window.setTimeout(() => setPhase("confirm"), 1380);
     } catch (err) {
+      analysisJobRef.current += 1;
       URL.revokeObjectURL(previewUrl);
       setError(err instanceof Error ? err.message : "Could not create the sticker.");
+      setAnalysisPending(false);
       setProgress(0);
       setPhase("camera");
     } finally {
@@ -225,6 +240,7 @@ function StickerLab() {
   }
 
   function resetFlow() {
+    analysisJobRef.current += 1;
     stopCamera();
     window.clearTimeout(revealTimerRef.current);
     setPhase("camera");
@@ -237,6 +253,7 @@ function StickerLab() {
     setStickerUrl(null);
     setMaskUrl(null);
     setAnalysis(fallbackAnalysis);
+    setAnalysisPending(false);
   }
 
   function addToHistory() {
@@ -257,6 +274,7 @@ function StickerLab() {
 
   const commonProps = {
     analysis,
+    analysisPending,
     burstKey,
     error,
     fileInputRef,
@@ -351,16 +369,7 @@ function CaptureFlow({
         <FocusCorners hidden={false} />
 
         {phase === "cutting" && sourceUrl && (
-          <div className="cutting-layer" aria-live="polite">
-            <div className="scan-beam" style={{ "--scan-progress": `${Math.min(88, Math.max(14, progress))}%` }} />
-            <div className="edge-glow" />
-            <div className="cutting-wash" />
-            <div className="scan-pill">
-              <ScanLine size={15} />
-              <span>{getCuttingCopy(progress)} {progress}%</span>
-              <i style={{ "--progress": `${progress}%` }} />
-            </div>
-          </div>
+          <div className="cutting-layer" aria-live="polite" aria-label={`Preparing sticker ${progress}%`} />
         )}
       </div>
 
@@ -415,12 +424,16 @@ function CaptureFlow({
 function ConfirmFlow({ burstKey, isRevealing, maskUrl, onBack, onConfirm, onRetake, sourceUrl, stickerUrl }) {
   return (
     <section className={`confirm-flow ${isRevealing ? "is-revealing" : ""}`}>
-      {isRevealing && sourceUrl && (
-        <PhotoDissolve key={`confirm-${sourceUrl}-${maskUrl || "full"}`} src={sourceUrl} maskSrc={maskUrl} compact />
-      )}
       <TopDateBar onBack={onBack} variant="dark" />
 
-      {maskUrl && <LiftedSubjectFrame src={maskUrl} aligned isRevealing={isRevealing} />}
+      {(isRevealing || maskUrl) && (
+        <div className="confirm-source-frame">
+          {isRevealing && sourceUrl && (
+            <PhotoDissolve key={`confirm-${sourceUrl}-${maskUrl || "full"}`} src={sourceUrl} maskSrc={maskUrl} compact />
+          )}
+          {maskUrl && <LiftedSubjectFrame src={maskUrl} aligned isRevealing={isRevealing} />}
+        </div>
+      )}
 
       <div className="confirm-stage">
         {!maskUrl && !isRevealing && stickerUrl && (
@@ -464,7 +477,17 @@ function LiftedSubjectFrame({ aligned, isRevealing, src }) {
   );
 }
 
-function DetailFlow({ analysis, onAdd, onBack, onDelete, onRetake, stickerUrl }) {
+function DetailFlow({ analysis, analysisPending, onAdd, onBack, onDelete, onRetake, stickerUrl }) {
+  const visibleAnalysis = analysisPending
+    ? {
+        ...analysis,
+        name: "Food sticker",
+        localName: "食物贴纸",
+        type: "待确认",
+        note: "可以先保存，名称和营养信息会自动补全。",
+      }
+    : analysis;
+
   return (
     <section className="detail-flow">
       <TopDateBar onBack={onBack} />
@@ -476,12 +499,12 @@ function DetailFlow({ analysis, onAdd, onBack, onDelete, onRetake, stickerUrl })
         </div>
 
         <div className="detail-title-row">
-          <h1>{analysis.name}</h1>
+          <h1>{visibleAnalysis.name}</h1>
           <button type="button" className="sound-button" aria-label="Listen">
             <Volume2 size={16} />
           </button>
         </div>
-        <p>{analysis.localName}</p>
+        <p>{visibleAnalysis.localName}</p>
 
         <div className="detail-actions">
           <button type="button" className="soft-circle" onClick={onRetake} aria-label="Back to sticker">
@@ -496,15 +519,15 @@ function DetailFlow({ analysis, onAdd, onBack, onDelete, onRetake, stickerUrl })
         </div>
 
         <div className="nutrition-ribbon" aria-label="Nutrition estimate">
-          <span>{analysis.type}</span>
-          <strong>~{analysis.calories} kcal</strong>
-          <span>{analysis.protein}g protein</span>
-          <span>{analysis.fiber}g fiber</span>
+          <span>{visibleAnalysis.type}</span>
+          <strong>~{visibleAnalysis.calories} kcal</strong>
+          <span>{visibleAnalysis.protein}g protein</span>
+          <span>{visibleAnalysis.fiber}g fiber</span>
         </div>
 
-        <div className="ai-note">
+        <div className={`ai-note ${analysisPending ? "is-pending" : ""}`}>
           <Sparkles size={14} />
-          <span>{analysis.note}</span>
+          <span>{visibleAnalysis.note}</span>
         </div>
       </article>
 
@@ -595,13 +618,22 @@ async function createCutout(file, onProgress) {
   }
 
   const { removeBackground } = await loadBackgroundRemoval();
-  return removeBackground(file, {
+  const maskBlob = await removeBackground(file, {
     ...cutoutConfig,
     progress: (_key, current, total) => {
       if (!total) return;
       onProgress(Math.min(92, Math.round((current / total) * 62) + 24));
     },
   });
+  return { maskBlob };
+}
+
+function normalizeCutoutResult(result) {
+  if (result instanceof Blob) return { maskBlob: result, stickerBlob: null };
+  return {
+    maskBlob: result?.maskBlob || result?.blob || null,
+    stickerBlob: result?.stickerBlob || null,
+  };
 }
 
 async function loadBackgroundRemoval() {
@@ -627,11 +659,24 @@ async function createRemoteCutout(endpoint, file, onProgress) {
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       const payload = await response.json();
-      if (payload.imageBase64) return dataUrlToBlob(payload.imageBase64);
-      if (payload.imageUrl) return fetchBlob(payload.imageUrl);
+      const maskBlob = payload.mask?.imageBase64
+        ? dataUrlToBlob(payload.mask.imageBase64, payload.mask.mime)
+        : payload.imageBase64
+          ? dataUrlToBlob(payload.imageBase64)
+          : null;
+      const stickerBlob = payload.sticker?.imageBase64
+        ? dataUrlToBlob(payload.sticker.imageBase64, payload.sticker.mime)
+        : null;
+      if (maskBlob || stickerBlob) {
+        return {
+          maskBlob: maskBlob || stickerBlob,
+          stickerBlob,
+        };
+      }
+      if (payload.imageUrl) return { maskBlob: await fetchBlob(payload.imageUrl) };
       throw new Error(payload.error || "High quality cutout failed.");
     }
-    return response.blob();
+    return { maskBlob: await response.blob() };
   } finally {
     window.clearTimeout(timeout);
   }
@@ -641,6 +686,7 @@ function resolveCutoutEndpoint(endpoint) {
   const url = new URL(endpoint, window.location.href);
   const model = getConfiguredCutoutModel();
   if (model) url.searchParams.set("model", model);
+  url.searchParams.set("response", "json");
   return url.toString();
 }
 
@@ -1287,18 +1333,18 @@ async function fetchBlob(url) {
   return response.blob();
 }
 
-function dataUrlToBlob(dataUrl) {
+function dataUrlToBlob(dataUrl, fallbackMime = "image/png") {
   if (!dataUrl.includes(",")) {
     const binary = atob(dataUrl);
     const bytes = new Uint8Array(binary.length);
     for (let index = 0; index < binary.length; index += 1) {
       bytes[index] = binary.charCodeAt(index);
     }
-    return new Blob([bytes], { type: "image/png" });
+    return new Blob([bytes], { type: fallbackMime });
   }
 
   const [header, data] = dataUrl.split(",");
-  const mime = header.match(/data:(.*);base64/)?.[1] || "image/png";
+  const mime = header.match(/data:(.*);base64/)?.[1] || fallbackMime;
   const binary = atob(data);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
@@ -1319,13 +1365,6 @@ function delay(ms) {
 
 function shouldUsePrebuiltSampleCutout() {
   return !new URLSearchParams(window.location.search).has("remoteSample");
-}
-
-function getCuttingCopy(value) {
-  if (value < 22) return "freezing frame";
-  if (value < 52) return "finding edges";
-  if (value < 82) return "lifting subject";
-  return "polishing sticker";
 }
 
 function stopStream(stream) {
