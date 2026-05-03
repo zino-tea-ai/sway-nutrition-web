@@ -15,6 +15,11 @@ import avocado from "./assets/stickers/avocado.png";
 import honey from "./assets/stickers/honey_pot.png";
 import sampleBottleCutout from "./assets/samples/tea-bottle-cutout.png";
 import sampleBottlePhoto from "./assets/samples/tea-bottle-source.jpg";
+import {
+  appendBoardSticker,
+  createBoardStickerFromAnalysis,
+  imageUrlToDataUrl,
+} from "./stickerBoardData.js";
 import "./sticker-lab.css";
 
 const CUTOUT_ENDPOINT_STORAGE_KEY = "vilo.cutoutEndpoint";
@@ -260,9 +265,11 @@ function StickerLab() {
 
   function addToHistory() {
     if (!stickerUrl) return;
+    const capturedAt = new Date();
+    const id = `capture-${capturedAt.getTime()}`;
     setHistory((items) => [
       {
-        id: `capture-${Date.now()}`,
+        id,
         date: todayLabel,
         image: stickerUrl,
         isCapture: true,
@@ -272,6 +279,7 @@ function StickerLab() {
       ...items,
     ]);
     setPhase("history");
+    persistStickerToBoard({ id, stickerUrl, analysis, capturedAt });
   }
 
   const commonProps = {
@@ -586,6 +594,15 @@ function TopDateBar({ onBack, variant = "light" }) {
       <span />
     </header>
   );
+}
+
+async function persistStickerToBoard({ id, stickerUrl, analysis, capturedAt }) {
+  try {
+    const image = await imageUrlToDataUrl(stickerUrl);
+    appendBoardSticker(createBoardStickerFromAnalysis({ id, image, analysis, capturedAt }));
+  } catch (err) {
+    console.info("Could not persist sticker board item.", err);
+  }
 }
 
 function FocusCorners({ hidden }) {

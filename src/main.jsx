@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
+import StickerBoard from "./StickerBoard.jsx";
 import StickerLab from "./StickerLab.jsx";
 import "./styles.css";
 
@@ -13,7 +14,9 @@ const Root =
   import.meta.env.VITE_STICKER_LAB_ONLY === "true" ||
   normalizedPath.startsWith("/sticker-lab")
     ? StickerLab
-    : App;
+    : normalizedPath.startsWith("/sticker-board")
+      ? StickerBoard
+      : App;
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
