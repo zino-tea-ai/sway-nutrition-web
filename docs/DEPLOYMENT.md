@@ -92,21 +92,46 @@ If the API returns that Pages is already configured, that is fine.
 
 ## Backend deploy on Fly
 
-Fly needs an account token. Once `FLY_API_TOKEN` is available:
+The fastest path from this Windows repo is the local deploy script. It deploys the Docker API to Fly, smoke-tests `/health`, `/api/cutout?response=json`, `/api/analyze-food`, writes the public API URLs into Vercel env, then deploys Vercel production again.
+
+```powershell
+npm run deploy:cutout:fly
+```
+
+Prerequisites:
+
+- Fly CLI installed: `winget install Fly.Flyctl`
+- Vercel CLI logged in: `vercel whoami`
+- `OPENROUTER_API_KEY` available in the shell or in `.env`
+
+Useful variants:
+
+```powershell
+npm run deploy:cutout:fly -- -AppName vilo-cutout-api-zino
+npm run deploy:cutout:fly -- -SkipVercelDeploy
+npm run deploy:cutout:fly -- -EnvPath C:\path\to\.env
+```
+
+After deployment, the Vercel frontend should have:
+
+```text
+VITE_VILO_CUTOUT_ENDPOINT=https://vilo-cutout-api-zino.fly.dev/api/cutout
+VITE_VILO_ANALYZE_ENDPOINT=https://vilo-cutout-api-zino.fly.dev/api/analyze-food
+VITE_VILO_REMOTE_CUTOUT_MODEL=isnet-general-use
+```
+
+You can smoke-test any public backend without redeploying:
+
+```powershell
+npm run qa:cutout:public -- --cutout-endpoint https://vilo-cutout-api-zino.fly.dev/api/cutout
+```
+
+The GitHub Actions path is still available if you prefer token-based deploy from GitHub:
 
 ```powershell
 gh secret set FLY_API_TOKEN --repo zino-tea-ai/sway-nutrition-web
 gh secret set OPENROUTER_API_KEY --repo zino-tea-ai/sway-nutrition-web
-gh workflow run "Deploy cutout API to Fly" --repo zino-tea-ai/sway-nutrition-web -f app_name=vilo-cutout-api
-```
-
-After Fly returns the public host, wire the frontend to it:
-
-```powershell
-gh variable set VILO_CUTOUT_ENDPOINT --repo zino-tea-ai/sway-nutrition-web --body "https://vilo-cutout-api.fly.dev/api/cutout"
-gh variable set VILO_ANALYZE_ENDPOINT --repo zino-tea-ai/sway-nutrition-web --body "https://vilo-cutout-api.fly.dev/api/analyze-food"
-gh variable set VILO_REMOTE_CUTOUT_MODEL --repo zino-tea-ai/sway-nutrition-web --body "isnet-general-use"
-gh workflow run "Deploy frontend to GitHub Pages" --repo zino-tea-ai/sway-nutrition-web
+gh workflow run "Deploy cutout API to Fly" --repo zino-tea-ai/sway-nutrition-web -f app_name=vilo-cutout-api-zino
 ```
 
 ## Backend env
@@ -117,12 +142,13 @@ Set these on the container host:
 VILO_CUTOUT_MODEL=isnet-general-use
 VILO_MAX_UPLOAD_MB=12
 VILO_MAX_INPUT_PIXELS=9000000
-VILO_CORS_ORIGINS=https://zino-tea-ai.github.io
+VILO_CORS_ORIGINS=https://sway-nutrition-web.vercel.app,https://zino-tea-ai.github.io
+VILO_CORS_ORIGIN_REGEX=^https://.*\.vercel\.app$
 VILO_WARMUP=1
 VILO_ANALYZE_PROVIDER=openrouter
 OPENROUTER_API_KEY=<set as a host secret>
 VILO_OPENROUTER_MODEL=google/gemini-2.5-flash
-VILO_OPENROUTER_SITE_URL=https://zino-tea-ai.github.io/sway-nutrition-web/
+VILO_OPENROUTER_SITE_URL=https://sway-nutrition-web.vercel.app/
 VILO_OPENROUTER_APP_TITLE=Vilo Sticker Lab
 ```
 

@@ -86,10 +86,10 @@ docker run --rm -p 8787:8787 `
 Fly.io:
 
 ```powershell
-copy services\cutout_api\fly.toml.example fly.toml
-fly launch --no-deploy
-fly deploy
+npm run deploy:cutout:fly
 ```
+
+That script deploys Fly, smoke-tests the public API, writes the backend URL into Vercel env, and redeploys the frontend.
 
 The repo also includes GitHub Actions for:
 
