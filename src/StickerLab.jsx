@@ -85,6 +85,43 @@ function StickerLab() {
   const [error, setError] = useState("");
   const [history, setHistory] = useState(seedHistory);
   const [burstKey, setBurstKey] = useState(0);
+  const [path, setPath] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  useEffect(() => {
+    if (path === "/capture/confirm") {
+      if (!stickerUrl) {
+        navigate("/capture", { replace: true });
+        return;
+      }
+      if (phase !== "confirm") setPhase("confirm");
+    } else if (path === "/capture/detail") {
+      if (!stickerUrl) {
+        navigate("/capture", { replace: true });
+        return;
+      }
+      if (phase !== "detail") setPhase("detail");
+    } else if (path === "/capture") {
+      if (phase === "confirm" || phase === "detail") {
+        setPhase("camera");
+      }
+    }
+  }, [path, stickerUrl]);
+
+  useEffect(() => {
+    const target =
+      phase === "confirm" ? "/capture/confirm" : phase === "detail" ? "/capture/detail" : null;
+    if (target && window.location.pathname !== target) {
+      navigate(target);
+    } else if (!target && window.location.pathname.startsWith("/capture/")) {
+      navigate("/capture");
+    }
+  }, [phase]);
 
   useEffect(() => {
     if (videoRef.current && cameraStream) {
