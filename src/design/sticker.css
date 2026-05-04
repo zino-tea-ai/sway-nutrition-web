@@ -1,0 +1,14 @@
+.vilo-sticker-media {
+  object-fit: contain;
+  filter: var(--vilo-sticker-contact);
+}
+
+.vilo-sticker-media.is-hero {
+  filter: var(--vilo-sticker-contact-hero);
+}
+
+.vilo-sticker-label {
+  border-radius: var(--vilo-radius-pill);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--vilo-color-muted);
+}

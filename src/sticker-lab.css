@@ -1,39 +1,26 @@
-@font-face {
-  font-family: "Outfit";
-  src: url("./assets/fonts/outfit-normal.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Outfit";
-  src: url("./assets/fonts/outfit-medium.ttf") format("truetype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
 * {
   box-sizing: border-box;
 }
 
 .sticker-lab {
-  --ink: #111214;
-  --subtle: rgba(17, 18, 20, 0.5);
-  --paper: #fbfaf8;
+  --ink: var(--vilo-color-ink);
+  --subtle: var(--vilo-color-muted);
+  --paper: var(--vilo-color-surface-raised);
   --phone-width: 430px;
   --shutter-size: 84px;
   --warm: #fff0a9;
-  min-height: 100dvh;
+  min-height: 100%;
   width: 100%;
+  max-width: var(--phone-width);
+  align-self: center;
   display: flex;
-  justify-content: center;
+  align-items: center;
+  justify-content: flex-start;
   margin: 0;
   overflow-x: hidden;
-  background: #eef0f4;
+  background: var(--vilo-color-page);
   color: var(--ink);
-  font-family: "Outfit", "Segoe UI", sans-serif;
+  font-family: var(--vilo-font-sans);
   letter-spacing: 0;
 }
 
@@ -49,7 +36,7 @@
   position: relative;
   width: 100%;
   max-width: var(--phone-width);
-  min-height: 100dvh;
+  min-height: 100%;
   overflow: hidden;
   background: var(--paper);
 }
@@ -881,12 +868,10 @@
   }
 
   .app-viewport {
-    width: min(var(--phone-width), calc(100vw - 32px));
-    min-height: min(900px, 100dvh);
-    border-radius: 34px;
-    box-shadow:
-      0 42px 90px rgba(23, 27, 33, 0.22),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+    width: min(var(--phone-width), 100vw);
+    min-height: 100%;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .capture-bottom {
@@ -919,5 +904,284 @@
   .detail-title-row h1 {
     font-size: 23px;
     line-height: 25px;
+  }
+}
+
+@media (max-height: 760px) {
+  .capture-media {
+    min-height: 500px;
+  }
+
+  .empty-camera {
+    padding-block: var(--vilo-space-6);
+  }
+
+  .empty-camera h1 {
+    font-size: 46px;
+  }
+}
+
+/* Vilo system alignment: scan is a page in the same product, not a separate camera app. */
+.app-viewport {
+  background: var(--vilo-color-page);
+  min-height: 100%;
+}
+
+.capture-flow {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  gap: var(--vilo-space-5);
+  padding: calc(var(--vilo-safe-top) + var(--vilo-space-5)) var(--vilo-page-gutter) var(--vilo-space-5);
+  overflow: visible;
+  background: var(--vilo-color-page);
+  color: var(--vilo-color-ink);
+}
+
+.capture-page-head {
+  display: grid;
+  gap: var(--vilo-space-3);
+  flex: 0 0 auto;
+}
+
+.capture-page-head span {
+  color: var(--vilo-color-muted);
+  font-size: var(--vilo-text-label);
+  font-weight: var(--vilo-font-weight-medium);
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.capture-page-head h1 {
+  width: min(350px, 100%);
+  margin: 0;
+  font-size: clamp(52px, 13.6vw, 68px);
+  font-weight: var(--vilo-font-weight-medium);
+  letter-spacing: -0.055em;
+  line-height: 0.9;
+}
+
+.capture-page-head p {
+  width: min(300px, 100%);
+  margin: 0;
+  color: var(--vilo-color-muted);
+  font-size: var(--vilo-text-body);
+  line-height: 1.24;
+}
+
+.capture-media {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 100%;
+  max-width: none;
+  aspect-ratio: auto;
+  height: clamp(320px, 44dvh, 430px);
+  min-height: 0;
+  margin: 0 auto;
+  border-radius: var(--vilo-radius-hero);
+  background:
+    radial-gradient(circle at 52% 34%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 34%),
+    var(--vilo-color-surface);
+  box-shadow: var(--vilo-shadow-hero);
+  transform: none;
+}
+
+.capture-media video,
+.capture-photo {
+  object-fit: cover;
+  background: #111214;
+}
+
+.empty-camera {
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  align-items: center;
+  gap: var(--vilo-space-5);
+  padding: var(--vilo-space-7) var(--vilo-space-6);
+  color: var(--vilo-color-ink);
+}
+
+.empty-camera-mark {
+  position: relative;
+  top: auto;
+  left: auto;
+  align-self: center;
+  width: 78px;
+  height: 78px;
+  margin-top: 0;
+  background: var(--vilo-color-surface-inset);
+  color: var(--vilo-color-ink);
+  box-shadow: inset 0 0 0 1px var(--vilo-color-line-soft);
+  transform: none;
+}
+
+.camera-target-copy {
+  align-self: end;
+  color: var(--vilo-color-faint);
+  font-size: var(--vilo-text-caption);
+  font-weight: var(--vilo-font-weight-medium);
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.capture-close {
+  display: none;
+}
+
+.focus-corners i {
+  border-color: rgba(8, 9, 10, 0.16);
+  filter: none;
+}
+
+.capture-bottom {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr);
+  gap: var(--vilo-space-3);
+  margin-top: 0;
+  flex: 0 0 auto;
+}
+
+.sticker-lab .ghost-button {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid var(--vilo-color-line-soft);
+  background: rgba(255, 255, 255, 0.64);
+  color: var(--vilo-color-ink);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.sticker-lab .ghost-button span {
+  display: inline;
+}
+
+.sticker-lab .ghost-button:hover {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.sticker-lab .ghost-button:disabled {
+  color: var(--vilo-color-faint);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.sticker-lab .shutter-button {
+  width: 92px;
+  height: 54px;
+  border-radius: var(--vilo-radius-pill);
+  background: var(--vilo-color-ink);
+  color: var(--vilo-color-surface-raised);
+  box-shadow: 0 10px 24px rgba(8, 9, 10, 0.16);
+}
+
+.sticker-lab .shutter-button:hover {
+  background: #000;
+}
+
+.camera-error {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  margin: var(--vilo-space-4) 0 0;
+  background: var(--vilo-color-surface-raised);
+  color: var(--vilo-color-watch);
+  box-shadow: none;
+}
+
+.confirm-flow,
+.detail-flow,
+.history-flow {
+  background: var(--vilo-color-page);
+  color: var(--vilo-color-ink);
+}
+
+.top-date-bar {
+  top: calc(var(--vilo-safe-top) + var(--vilo-space-3));
+  left: var(--vilo-page-gutter);
+  right: var(--vilo-page-gutter);
+}
+
+.top-date-bar.is-dark,
+.top-date-bar.is-light {
+  color: var(--vilo-color-ink);
+}
+
+.top-date-bar strong {
+  margin-top: var(--vilo-space-6);
+  color: var(--vilo-color-muted);
+  font-size: var(--vilo-text-label);
+  font-weight: var(--vilo-font-weight-medium);
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.confirm-source-frame {
+  border-radius: var(--vilo-radius-hero);
+  background: var(--vilo-color-surface);
+  box-shadow: var(--vilo-shadow-hero);
+}
+
+.reveal-pill,
+.soft-circle,
+.main-check,
+.sound-button {
+  background: var(--vilo-color-surface-raised);
+  color: var(--vilo-color-ink);
+  box-shadow: var(--vilo-shadow-floating);
+}
+
+.main-check {
+  background: var(--vilo-color-ink);
+  color: var(--vilo-color-surface-raised);
+}
+
+.sticker-detail-card {
+  padding-top: calc(var(--vilo-safe-top) + var(--vilo-space-10));
+}
+
+.nutrition-ribbon span,
+.nutrition-ribbon strong,
+.ai-note {
+  background: var(--vilo-color-surface-inset);
+}
+
+.add-copy-button {
+  height: 52px;
+  min-width: 148px;
+  background: var(--vilo-color-ink);
+  color: var(--vilo-color-surface-raised);
+  box-shadow: 0 10px 24px rgba(8, 9, 10, 0.16);
+}
+
+.sticker-object img {
+  filter: var(--vilo-sticker-contact-hero);
+}
+
+@media (max-width: 430px) {
+  .capture-media,
+  .capture-bottom {
+    width: calc(100% - var(--vilo-space-4));
+  }
+
+  .capture-bottom {
+    grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr);
+    gap: var(--vilo-space-2);
+  }
+
+  .sticker-lab .ghost-button {
+    padding: 0 var(--vilo-space-3);
+  }
+
+  .sticker-lab .shutter-button {
+    width: 84px;
   }
 }

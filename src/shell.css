@@ -3,9 +3,9 @@
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
-  background: #f5f1eb;
-  color: #181818;
-  font-family: "Outfit", "Segoe UI", sans-serif;
+  background: var(--vilo-color-page);
+  color: var(--vilo-color-ink);
+  font-family: var(--vilo-font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -20,19 +20,40 @@
 .tab-bar {
   position: sticky;
   bottom: 0;
+  width: min(100%, 430px);
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  gap: var(--vilo-space-2);
+  padding: var(--vilo-space-2) var(--vilo-page-gutter) calc(var(--vilo-space-3) + var(--vilo-safe-bottom));
+  background:
+    linear-gradient(180deg, rgba(236, 236, 234, 0), var(--vilo-color-page) 36%, var(--vilo-color-page) 100%);
+  border: 0;
   z-index: 50;
 }
 
+.tab-bar::before {
+  content: "";
+  position: absolute;
+  left: var(--vilo-page-gutter);
+  right: var(--vilo-page-gutter);
+  top: var(--vilo-space-2);
+  bottom: calc(var(--vilo-space-3) + var(--vilo-safe-bottom));
+  border: 1px solid var(--vilo-color-line-soft);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--vilo-shadow-floating);
+}
+
+.tab-bar::after {
+  display: none;
+}
+
 .tab-item {
+  position: relative;
+  z-index: 1;
+  min-height: 62px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -41,20 +62,42 @@
   padding: 6px 4px;
   background: transparent;
   border: 0;
-  color: rgba(60, 60, 67, 0.6);
+  color: var(--vilo-color-faint);
   font: inherit;
   font-size: 11px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   cursor: pointer;
   transition: color 120ms ease;
 }
 
+.tab-item,
+.tab-action {
+  min-width: 0;
+}
+
+.tab-item:first-of-type {
+  grid-column: 1;
+}
+
+.tab-item:last-of-type {
+  grid-column: 3;
+}
+
 .tab-item:hover {
-  color: rgba(60, 60, 67, 0.85);
+  color: var(--vilo-color-muted);
 }
 
 .tab-item.is-active {
-  color: #181818;
+  color: var(--vilo-color-ink);
+}
+
+.tab-item.is-active::before {
+  content: "";
+  position: absolute;
+  inset: 8px 13px;
+  z-index: -1;
+  border-radius: 999px;
+  background: rgba(8, 9, 10, 0.045);
 }
 
 .tab-item span {
@@ -63,30 +106,45 @@
 
 /* Center action — raised circular capture button */
 .tab-action {
+  position: relative;
+  z-index: 1;
   justify-self: center;
-  display: inline-flex;
+  width: 100%;
+  min-height: 62px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 60px;
-  margin-top: -22px;
-  border: 3px solid #f5f1eb;
-  border-radius: 50%;
-  background: #181818;
-  color: #fff;
+  gap: 3px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--vilo-color-faint);
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  font: inherit;
+  font-size: 11px;
+  box-shadow: none;
+  transition: color 120ms ease, transform 120ms ease;
+}
+
+.tab-action::after {
+  content: "Scan";
+  font-weight: 500;
 }
 
 .tab-action:hover {
+  color: var(--vilo-color-muted);
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
 }
 
 .tab-action:active {
   transform: translateY(1px) scale(0.96);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.tab-action.is-active {
+  color: var(--vilo-color-surface-raised);
+  background: var(--vilo-color-ink);
+  box-shadow: 0 8px 18px rgba(8, 9, 10, 0.12);
 }
 
 /* You view (placeholder) */
@@ -94,8 +152,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: calc(20px + env(safe-area-inset-top)) 24px 24px;
-  gap: 24px;
+  padding: calc(var(--vilo-space-5) + var(--vilo-safe-top)) var(--vilo-space-6) var(--vilo-space-6);
+  gap: var(--vilo-space-6);
 }
 
 .you-view-head .eyebrow {
@@ -145,8 +203,8 @@
   margin-top: 14px;
   padding: 10px 18px;
   border-radius: 999px;
-  background: #181818;
-  color: #fff;
+  background: var(--vilo-color-ink);
+  color: var(--vilo-color-surface-raised);
   border: 0;
   font: inherit;
   font-size: 14px;
@@ -154,5 +212,5 @@
 }
 
 /* When tab bar is visible, the in-tab content (e.g. StickerBoard) needs bottom padding
-   so the home indicator and tab bar don't cover real content. The tab bar is sticky inside
+  so the home indicator and tab bar don't cover real content. The tab bar is sticky inside
    the scroll container, so this only matters if a child uses fixed positioning. */

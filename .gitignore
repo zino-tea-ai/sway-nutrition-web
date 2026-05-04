@@ -2,6 +2,8 @@ node_modules/
 dist/
 .vercel/
 qa-screens/
+output/
+tmp/
 .venv-cutout/
 services/cutout_api/.u2net/
 __pycache__/

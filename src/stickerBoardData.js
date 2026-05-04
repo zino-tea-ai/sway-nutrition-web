@@ -1,9 +1,9 @@
-import avocado from "./assets/stickers/avocado.png";
-import bowl from "./assets/stickers/bowl_with_spoon.png";
-import bread from "./assets/stickers/bread.png";
-import fire from "./assets/stickers/fire.png";
-import milk from "./assets/stickers/glass_of_milk.png";
-import strawberry from "./assets/stickers/strawberry.png";
+import avocadoToast from "./assets/stickers/v5/avocado_toast.png";
+import honeyToast from "./assets/stickers/v5/honey_toast.png";
+import milkBerries from "./assets/stickers/v5/milk_berries.png";
+import salmonBowl from "./assets/stickers/v5/salmon_bowl.png";
+import spicyNoodles from "./assets/stickers/v5/spicy_noodles.png";
+import strawberryYogurt from "./assets/stickers/v5/strawberry_yogurt.png";
 
 export const STICKER_BOARD_STORAGE_KEY = "vilo.todayStickerBoard.v1";
 export const STICKER_BOARD_UPDATED_EVENT = "vilo:sticker-board-updated";
@@ -99,7 +99,7 @@ export const seedBoardItems = [
     name: "Salmon rice bowl",
     localName: "Lunch",
     time: "12:42",
-    image: bowl,
+    image: salmonBowl,
     kcal: 520,
     attributes: {
       protein: 3,
@@ -123,7 +123,7 @@ export const seedBoardItems = [
     name: "Berry yogurt",
     localName: "Breakfast",
     time: "08:18",
-    image: strawberry,
+    image: strawberryYogurt,
     kcal: 310,
     attributes: {
       protein: 2,
@@ -147,7 +147,7 @@ export const seedBoardItems = [
     name: "Honey toast",
     localName: "Snack",
     time: "16:12",
-    image: bread,
+    image: honeyToast,
     kcal: 190,
     attributes: {
       protein: 0,
@@ -171,7 +171,7 @@ export const seedBoardItems = [
     name: "Avocado toast",
     localName: "Dinner",
     time: "19:05",
-    image: avocado,
+    image: avocadoToast,
     kcal: 340,
     attributes: {
       protein: 1,
@@ -195,7 +195,7 @@ export const seedBoardItems = [
     name: "Spicy fried noodles",
     localName: "Late dinner",
     time: "21:20",
-    image: fire,
+    image: spicyNoodles,
     kcal: 680,
     attributes: {
       protein: 1,
@@ -219,7 +219,7 @@ export const seedBoardItems = [
     name: "Milk and berries",
     localName: "Light snack",
     time: "10:34",
-    image: milk,
+    image: milkBerries,
     kcal: 210,
     attributes: {
       protein: 1,

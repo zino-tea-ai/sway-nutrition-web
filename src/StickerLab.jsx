@@ -31,17 +31,17 @@ const LOCAL_ANALYZE_ENDPOINT = "http://127.0.0.1:8787/api/analyze-food";
 const CUTOUT_MAX_SOURCE_EDGE = 1600;
 const CUTOUT_UPLOAD_TYPE = "image/jpeg";
 const CUTOUT_UPLOAD_QUALITY = 0.88;
-const todayLabel = "5月03";
+const todayLabel = "Mon, May 4";
 
 const fallbackAnalysis = {
   name: "Master Kong Unsweetened Iced Black Tea",
-  localName: "康师傅无糖冰红茶",
-  type: "饮料 / 茶饮",
+  localName: "Unsweetened black tea",
+  type: "Drink / tea",
   calories: 0,
   protein: 0,
   fiber: 0,
   confidence: 0.86,
-  note: "无糖茶饮热量很低，适合记录为轻负担饮品；如果搭配正餐，继续看整体蛋白和纤维。",
+  note: "Very low load. Keep pairing drinks with enough protein and fiber so the whole day stays steady.",
 };
 
 const cutoutConfig = {
@@ -54,17 +54,17 @@ let backgroundRemovalModulePromise;
 const seedHistory = [
   {
     id: "seed-tea",
-    date: "5月01",
+    date: "May 1",
     image: honey,
     name: "Honey toast",
-    localName: "蜂蜜吐司",
+    localName: "Honey toast",
   },
   {
     id: "seed-gum",
-    date: "4月29",
+    date: "Apr 29",
     image: avocado,
     name: "Avocado snack",
-    localName: "牛油果加餐",
+    localName: "Avocado snack",
   },
 ];
 
@@ -403,8 +403,20 @@ function CaptureFlow({
   sourceUrl,
   videoRef,
 }) {
+  const isCutting = phase === "cutting";
+  const title = isCutting ? "Lifting your sticker" : "Make a food sticker";
+  const description = isCutting
+    ? "Vilo is separating the meal from the background."
+    : "Snap or upload a meal. Vilo lifts it into today.";
+
   return (
     <section className={`capture-flow is-${phase}`}>
+      <header className="capture-page-head">
+        <span>Scan</span>
+        <h1>{title}</h1>
+        <p>{description}</p>
+      </header>
+
       <div className="capture-media">
         {cameraStream ? (
           <video ref={videoRef} autoPlay playsInline muted />
@@ -415,8 +427,7 @@ function CaptureFlow({
             <div className="empty-camera-mark">
               <Camera size={32} />
             </div>
-            <h1>Make a food sticker</h1>
-            <p>Snap food. Lift it out. Save the story.</p>
+            <span className="camera-target-copy">Frame the food</span>
           </div>
         )}
 
@@ -456,10 +467,10 @@ function CaptureFlow({
           className="ghost-button"
           disabled={phase === "cutting"}
           onClick={onSample}
-          aria-label="Sample"
+          aria-label="Try sample"
         >
           <Sparkles size={18} />
-          <span>Sample</span>
+          <span>Try</span>
         </button>
       </div>
 
@@ -540,9 +551,9 @@ function DetailFlow({ analysis, analysisPending, onAdd, onBack, onDelete, onReta
     ? {
         ...analysis,
         name: "Food sticker",
-        localName: "食物贴纸",
-        type: "待确认",
-        note: "可以先保存，名称和营养信息会自动补全。",
+        localName: "Analyzing food",
+        type: "Pending",
+        note: "You can save this first. Name and nutrition signals will fill in automatically.",
       }
     : analysis;
 
@@ -590,7 +601,7 @@ function DetailFlow({ analysis, analysisPending, onAdd, onBack, onDelete, onReta
       </article>
 
       <button type="button" className="add-copy-button" onClick={onAdd}>
-        加入今天
+        Add to today
       </button>
     </section>
   );
@@ -614,7 +625,7 @@ function HistoryFlow({ history, onBack, onNew }) {
         {Object.entries(grouped).map(([date, items]) => (
           <section key={date} className="history-group">
             <h2>{date}</h2>
-            <small>{items.length} 个事项</small>
+            <small>{items.length} items</small>
             <div className="history-grid">
               {items.map((item) => (
                 <article key={item.id} className={`history-item ${item.isCapture ? "is-capture" : ""}`}>

@@ -1,0 +1,27 @@
+.vilo-surface {
+  border: 1px solid var(--vilo-color-line-soft);
+  border-radius: var(--vilo-radius-card);
+  background: var(--vilo-color-surface);
+  box-shadow: var(--vilo-shadow-card);
+}
+
+.vilo-pill {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--vilo-radius-pill);
+}
+
+.vilo-icon-button {
+  min-width: var(--vilo-touch-target);
+  min-height: var(--vilo-touch-target);
+  display: grid;
+  place-items: center;
+  border-radius: var(--vilo-radius-round);
+}
+
+.vilo-hit-target {
+  min-width: var(--vilo-touch-target);
+  min-height: var(--vilo-touch-target);
+}

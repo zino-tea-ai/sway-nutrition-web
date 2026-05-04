@@ -1,11 +1,12 @@
 import { Camera, Layers, User } from "lucide-react";
 import React, { Suspense, lazy, useEffect, useSyncExternalStore } from "react";
+import HomeStructure from "./HomeStructure.jsx";
 import StickerBoard from "./StickerBoard.jsx";
 import StickerLab from "./StickerLab.jsx";
 import "./shell.css";
 
-// Legacy Sway app is loaded only when /legacy is hit, so its styles.css
-// (still 2500+ lines of global rules) doesn't pollute the main bundle.
+// Legacy Sway app is loaded only when /legacy is hit, so its global
+// styles do not pollute the new Vilo app surfaces.
 const LegacyApp = lazy(() => import("./App.jsx"));
 
 const rawBase = import.meta.env.BASE_URL || "/";
@@ -42,10 +43,17 @@ function usePath() {
 }
 
 const TABS = [
-  { id: "today", label: "今天", path: "/today", icon: Layers },
-  { id: "capture", label: "拍", path: "/capture", icon: Camera, isAction: true },
-  { id: "you", label: "我", path: "/you", icon: User },
+  { id: "today", label: "Today", path: "/today", icon: Layers },
+  { id: "capture", label: "Scan", path: "/capture", icon: Camera, isAction: true },
+  { id: "you", label: "You", path: "/you", icon: User },
 ];
+
+function isStandaloneApp() {
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
+}
 
 function Shell() {
   const path = usePath();
@@ -55,8 +63,12 @@ function Shell() {
       if (!path.startsWith("/capture")) navigate("/capture", { replace: true });
       return;
     }
+    if (isStandaloneApp() && path === "/today") {
+      navigate("/home-structure", { replace: true });
+      return;
+    }
     if (path === "/" || path === "") {
-      navigate("/today", { replace: true });
+      navigate("/home-structure", { replace: true });
       return;
     }
     if (path === "/sticker-lab" || path.startsWith("/sticker-lab/")) {
@@ -82,18 +94,21 @@ function Shell() {
 
 function AppShell({ path }) {
   const isCapture = path === "/capture" || path.startsWith("/capture/");
+  const isCaptureRoot = path === "/capture";
   const isToday = path === "/today";
+  const isHomeStructure = path === "/home-structure";
   const isYou = path === "/you";
 
-  const showTabBar = isToday || isYou;
+  const showTabBar = isToday || isCaptureRoot || isYou;
 
   return (
     <div className="app-shell-frame">
       <div className="app-shell-content">
         {isCapture && <StickerLab />}
         {isToday && <StickerBoard />}
+        {isHomeStructure && <HomeStructure />}
         {isYou && <YouView />}
-        {!isCapture && !isToday && !isYou && <NotFound path={path} />}
+        {!isCapture && !isToday && !isHomeStructure && !isYou && <NotFound path={path} />}
       </div>
       {showTabBar && <TabBar path={path} />}
     </div>
@@ -102,7 +117,7 @@ function AppShell({ path }) {
 
 function TabBar({ path }) {
   return (
-    <nav className="tab-bar" role="tablist" aria-label="主导航">
+    <nav className="tab-bar" aria-label="Main navigation">
       {TABS.map((tab) => {
         const Icon = tab.icon;
         const active =
@@ -113,9 +128,10 @@ function TabBar({ path }) {
             <button
               key={tab.id}
               type="button"
-              className="tab-action"
+              className={`tab-action ${active ? "is-active" : ""}`}
               onClick={() => navigate(tab.path)}
               aria-label={tab.label}
+              aria-current={active ? "page" : undefined}
             >
               <Icon size={26} strokeWidth={2.2} />
             </button>
@@ -126,10 +142,9 @@ function TabBar({ path }) {
           <button
             key={tab.id}
             type="button"
-            role="tab"
-            aria-selected={active}
             className={`tab-item ${active ? "is-active" : ""}`}
             onClick={() => navigate(tab.path)}
+            aria-current={active ? "page" : undefined}
           >
             <Icon size={22} strokeWidth={1.9} />
             <span>{tab.label}</span>
@@ -144,16 +159,16 @@ function YouView() {
   return (
     <main className="you-view">
       <header className="you-view-head">
-        <p className="eyebrow">我</p>
-        <h1>设置</h1>
+        <p className="eyebrow">You</p>
+        <h1>Profile</h1>
       </header>
       <section className="you-placeholder">
-        <p>这里之后放：</p>
+        <p>This area will hold the account and preference system:</p>
         <ul>
-          <li>要追踪的目标（体重 / 能量 / 肠胃 / 睡眠 …）</li>
-          <li>单位偏好</li>
-          <li>历史 / 导出</li>
-          <li>关于</li>
+          <li>Primary and secondary goals</li>
+          <li>Units and reminders</li>
+          <li>History and exports</li>
+          <li>App settings</li>
         </ul>
       </section>
     </main>
@@ -165,12 +180,14 @@ function NotFound({ path }) {
     <main className="you-view">
       <header className="you-view-head">
         <p className="eyebrow">404</p>
-        <h1>没有这一页</h1>
+        <h1>Page not found</h1>
       </header>
       <section className="you-placeholder">
-        <p>路径 <code>{path}</code> 不在当前路由表里。</p>
+        <p>
+          Path <code>{path}</code> is not in the current route table.
+        </p>
         <button type="button" className="ghost-button" onClick={() => navigate("/today")}>
-          回今天
+          Back to Today
         </button>
       </section>
     </main>

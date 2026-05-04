@@ -1,0 +1,80 @@
+:root {
+  color-scheme: light;
+
+  --vilo-color-page: #ececea;
+  --vilo-color-surface: #f7f7f5;
+  --vilo-color-surface-raised: #ffffff;
+  --vilo-color-surface-inset: #eeeeec;
+  --vilo-color-panel: #f6f6f4;
+  --vilo-color-ink: #08090a;
+  --vilo-color-muted: rgba(8, 9, 10, 0.54);
+  --vilo-color-faint: rgba(8, 9, 10, 0.36);
+  --vilo-color-line: rgba(8, 9, 10, 0.08);
+  --vilo-color-line-soft: rgba(8, 9, 10, 0.055);
+  --vilo-color-positive: #648d54;
+  --vilo-color-watch: #b46b55;
+  --vilo-statusbar-bg: var(--vilo-color-page);
+  --vilo-tabbar-bg: rgba(255, 255, 255, 0.9);
+
+  --vilo-space-0: 0;
+  --vilo-space-1: 4px;
+  --vilo-space-2: 8px;
+  --vilo-space-3: 12px;
+  --vilo-space-4: 16px;
+  --vilo-space-5: 20px;
+  --vilo-space-6: 24px;
+  --vilo-space-7: 32px;
+  --vilo-space-8: 40px;
+  --vilo-space-9: 56px;
+  --vilo-space-10: 72px;
+
+  --vilo-page-gutter: var(--vilo-space-5);
+  --vilo-card-pad: var(--vilo-space-6);
+  --vilo-section-gap: var(--vilo-space-6);
+
+  --vilo-radius-sm: 12px;
+  --vilo-radius-md: 20px;
+  --vilo-radius-lg: 28px;
+  --vilo-radius-card: 34px;
+  --vilo-radius-hero: 42px;
+  --vilo-radius-pill: 999px;
+  --vilo-radius-round: 50%;
+
+  --vilo-shadow-card: 0 14px 42px rgba(8, 9, 10, 0.028);
+  --vilo-shadow-hero: 0 20px 62px rgba(8, 9, 10, 0.032);
+  --vilo-shadow-floating: 0 12px 34px rgba(8, 9, 10, 0.035);
+  --vilo-shadow-button: 0 6px 18px rgba(0, 0, 0, 0.22);
+
+  --vilo-font-sans: "Outfit", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --vilo-font-weight-regular: 400;
+  --vilo-font-weight-medium: 500;
+  --vilo-text-label: 12px;
+  --vilo-text-caption: 13px;
+  --vilo-text-body: 17px;
+  --vilo-text-card-title: 42px;
+  --vilo-text-brand: 42px;
+  --vilo-text-hero-min: 54px;
+  --vilo-text-hero-max: 72px;
+
+  --vilo-safe-top: env(safe-area-inset-top);
+  --vilo-safe-bottom: env(safe-area-inset-bottom);
+  --vilo-chrome-top: max(var(--vilo-space-3), calc(var(--vilo-safe-top) + var(--vilo-space-3)));
+  --vilo-tabbar-height: 88px;
+  --vilo-bottom-chrome: calc(var(--vilo-tabbar-height) + var(--vilo-safe-bottom));
+
+  --vilo-touch-target: 44px;
+  --vilo-motion-fast: 120ms;
+  --vilo-motion-normal: 220ms;
+
+  --vilo-sticker-contact: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.96)) drop-shadow(0 2px 2px rgba(8, 9, 10, 0.045));
+  --vilo-sticker-contact-hero: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.96)) drop-shadow(0 2px 3px rgba(8, 9, 10, 0.05));
+  --vilo-sticker-thumb: 74px;
+  --vilo-sticker-board: 96px;
+  --vilo-sticker-hero: 196px;
+}
+
+@media (max-width: 390px) {
+  :root {
+    --vilo-page-gutter: var(--vilo-space-4);
+  }
+}

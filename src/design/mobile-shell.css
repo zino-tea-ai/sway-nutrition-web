@@ -1,0 +1,29 @@
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+  background: var(--vilo-color-page);
+}
+
+body {
+  overflow-x: hidden;
+}
+
+#root::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 49;
+  height: var(--vilo-safe-top);
+  background: var(--vilo-statusbar-bg);
+  pointer-events: none;
+}
+
+.app-shell-frame {
+  background: var(--vilo-color-page);
+}
+
+.app-shell-content {
+  background: var(--vilo-color-page);
+}
