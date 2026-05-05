@@ -30,10 +30,13 @@
 }
 
 .structure-appbar {
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
 }
 
 .structure-streak {
+  justify-self: start;
   gap: var(--vilo-space-2);
   font-size: 22px;
 }
@@ -53,12 +56,14 @@
 }
 
 .structure-title {
+  justify-self: center;
   gap: var(--vilo-space-2);
   font-size: 21px;
   letter-spacing: -0.02em;
 }
 
 .structure-icon-button {
+  justify-self: end;
   width: 42px;
   height: 42px;
   display: grid;
@@ -132,6 +137,7 @@
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 126px;
+  gap: var(--vilo-space-4);
   align-items: center;
   overflow: hidden;
   padding: var(--vilo-space-5);
@@ -164,6 +170,7 @@
   height: 138px;
   display: grid;
   place-items: center;
+  justify-self: center;
   border-radius: var(--vilo-radius-round);
   background: rgba(255, 189, 34, 0.34);
 }
@@ -248,6 +255,7 @@
   fill: var(--vilo-color-muted);
   font-size: 17px;
   font-weight: var(--vilo-font-weight-medium);
+  text-anchor: middle;
 }
 
 .structure-macro-grid {
@@ -258,7 +266,9 @@
 
 .structure-metric {
   display: grid;
+  justify-items: center;
   gap: var(--vilo-space-2);
+  text-align: center;
 }
 
 .structure-metric strong {
@@ -273,6 +283,7 @@
 }
 
 .structure-metric i {
+  width: 100%;
   height: 7px;
   border-radius: var(--vilo-radius-pill);
   background:
@@ -338,7 +349,10 @@
 }
 
 .structure-meal-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 38px 22px;
   gap: var(--vilo-space-3);
+  align-items: center;
 }
 
 .structure-meal-row img {
@@ -350,7 +364,6 @@
 
 .structure-meal-row div {
   min-width: 0;
-  flex: 1;
   display: grid;
   gap: 2px;
 }
@@ -370,7 +383,6 @@
 }
 
 .structure-meal-row b {
-  min-width: 38px;
   text-align: right;
   font-size: 15px;
 }
@@ -384,6 +396,7 @@
 }
 
 .structure-meal-row > svg {
+  justify-self: end;
   color: var(--vilo-color-faint);
 }
 
@@ -405,7 +418,9 @@
   z-index: 60;
   width: min(430px, 100%);
   transform: translateX(-50%);
-  justify-content: space-around;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
   padding: var(--vilo-space-3) var(--vilo-space-5) calc(var(--vilo-space-4) + var(--vilo-safe-bottom));
   border-top: 1px solid var(--vilo-color-line-soft);
   background: rgba(255, 255, 255, 0.86);
@@ -413,9 +428,10 @@
 }
 
 .structure-bottom-nav button {
-  min-width: 58px;
+  min-width: 0;
   display: grid;
   justify-items: center;
+  justify-self: stretch;
   gap: var(--vilo-space-1);
   border: 0;
   background: transparent;

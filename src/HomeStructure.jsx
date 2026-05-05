@@ -171,8 +171,8 @@ function ScoreArc({ score }) {
       <path className="is-fill" d="M18 74 C78 50 182 50 242 74" pathLength="100" style={{ "--score": score }} />
       <line x1="105" y1="50" x2="105" y2="65" />
       <line x1="158" y1="50" x2="158" y2="65" />
-      <text x="82" y="90">steady</text>
-      <text x="150" y="90">bright</text>
+      <text x="105" y="90">steady</text>
+      <text x="158" y="90">bright</text>
     </svg>
   );
 }
